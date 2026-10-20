@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
   },
 
   images: {
+    unoptimized: process.env.NETLIFY === 'true',
     remotePatterns: [
       // Douban images
       {
