@@ -30,7 +30,8 @@ export async function GET(request: Request) {
     if (data.subjects && Array.isArray(data.subjects)) {
       data.subjects = data.subjects.map((item: any) => ({
         ...item,
-        cover: item.cover ? `/api/douban/image?url=${encodeURIComponent(item.cover)}` : item.cover,
+        // v=2 用于绕过此前被错误缓存（同一张图）的浏览器缓存
+        cover: item.cover ? `/api/douban/image?v=2&url=${encodeURIComponent(item.cover)}` : item.cover,
       }));
     }
 
