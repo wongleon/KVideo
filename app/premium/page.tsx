@@ -7,7 +7,6 @@ import { Navbar } from '@/components/layout/Navbar';
 import { SearchResults } from '@/components/home/SearchResults';
 import { usePremiumHomePage } from '@/lib/hooks/usePremiumHomePage';
 import { PremiumContent } from '@/components/premium/PremiumContent';
-import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
 import { PremiumPasswordGate } from '@/components/PremiumPasswordGate';
 
 function PremiumHomePage() {
@@ -72,9 +71,6 @@ function PremiumHomePage() {
                     </>
                 )}
             </main>
-
-            {/* Favorites Sidebar - Left */}
-            <FavoritesSidebar isPremium={true} />
         </div>
     );
 }

@@ -1,7 +1,7 @@
 {
-    "name": "KVideo - 视频聚合平台",
-    "short_name": "KVideo",
-    "description": "多源视频聚合搜索和播放平台",
+    "name": "小视界",
+    "short_name": "小视界",
+    "description": "小视界多源视频聚合搜索和播放平台",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#000000",

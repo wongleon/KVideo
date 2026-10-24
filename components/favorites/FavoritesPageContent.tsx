@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
 import { FavoritesPageHeader } from '@/components/favorites/FavoritesPageHeader';
 import { FavoritesGrid } from '@/components/favorites/FavoritesGrid';
-import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
-import { WatchHistorySidebar } from '@/components/history/WatchHistorySidebar';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useFavorites } from '@/lib/store/favorites-store';
 
@@ -53,9 +51,6 @@ export function FavoritesPageContent({
 
         <FavoritesGrid favorites={sortedFavorites} isPremium={isPremium} />
       </main>
-
-      <FavoritesSidebar isPremium={isPremium} />
-      <WatchHistorySidebar isPremium={isPremium} />
 
       <ConfirmDialog
         isOpen={isClearDialogOpen}

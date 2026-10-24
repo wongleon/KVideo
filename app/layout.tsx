@@ -13,6 +13,7 @@ import { siteConfig } from "@/lib/config/site-config";
 import { AdKeywordsInjector } from "@/components/AdKeywordsInjector";
 import { BackToTop } from "@/components/ui/BackToTop";
 import { ScrollPositionManager } from "@/components/ScrollPositionManager";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { RuntimeFeaturesProvider } from "@/components/RuntimeFeaturesProvider";
 import { VideoTogetherController } from '@/components/VideoTogetherController';
@@ -97,10 +98,11 @@ export default async function RootLayout({
         {/* Apple PWA Support */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="KVideo" />
+        <meta name="apple-mobile-web-app-title" content="小视界" />
         <link rel="apple-touch-icon" href={siteIconSrc} />
         {/* Theme Color (for browser address bar) */}
-        <meta name="theme-color" content="#000000" />
+        <meta name="theme-color" content="#f2f4f7" />
+        <meta name="color-scheme" content="light dark" />
         {/* Mobile viewport */}
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
@@ -133,6 +135,7 @@ export default async function RootLayout({
                   <AutoSync />
                   <AdKeywordsWrapper />
                   {children}
+                  <BottomNav />
                   <BackToTop />
                   <ScrollPositionManager />
                 </PasswordGate>

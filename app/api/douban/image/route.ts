@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         if (contentType) {
             headers.set('Content-Type', contentType);
         }
-        headers.set('Cache-Control', 'public, max-age=15720000, s-maxage=15720000');
+        headers.set('Cache-Control', 'public, max-age=15724800, s-maxage=15724800');
         // Netlify 缓存 edge function 响应时默认不把 query 计入缓存键，
         // 不声明按 url 变化会导致所有海报命中同一份缓存（全站显示同一张图）。
         headers.set('Netlify-Vary', 'query=url');

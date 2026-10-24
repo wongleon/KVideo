@@ -37,6 +37,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       
       setActualTheme(themeToApply);
       document.documentElement.classList.toggle('dark', themeToApply === 'dark');
+      // 让浏览器/系统状态栏的文字颜色跟随主题
+      document.documentElement.style.colorScheme = themeToApply;
+
+      // 同步状态栏 / 浏览器主题色（iOS 主屏 PWA 会用它绘制状态栏背景）
+      const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+      if (themeColorMeta) {
+        themeColorMeta.setAttribute('content', themeToApply === 'dark' ? '#121212' : '#f2f4f7');
+      }
     };
 
     const applyThemeWithTransition = () => {

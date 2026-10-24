@@ -43,6 +43,24 @@
     --foreground: #1d1d1f;
 }
 
+/* html 也铺满主题背景，iOS 主屏 PWA 的状态栏区域会透出这层颜色 */
+html {
+    background-color: var(--bg-color);
+    background-image: var(--bg-image);
+}
+
+/* 深色主题直接作用在 html 上，保证状态栏区域随主题即时切换 */
+html.dark {
+    --bg-color: var(--bg-color-dark);
+    --bg-image: var(--bg-image-dark);
+    --text-color: var(--text-color-dark);
+    --text-color-secondary: var(--text-color-secondary-dark);
+    --accent-color: var(--accent-color-dark);
+    --glass-bg: var(--glass-bg-dark);
+    --glass-border: var(--glass-border-dark);
+    --shadow-color: var(--shadow-color-dark);
+}
+
 body {
     --bg-color: var(--bg-color-light);
     --bg-image: var(--bg-image-light);
@@ -57,6 +75,9 @@ body {
     background-image: var(--bg-image);
     color: var(--text-color);
     font-family: var(--font-family-system);
+
+    /* 全屏 PWA / iOS 主屏应用：为状态栏留出安全区，状态栏区域显示页面背景色 */
+    padding-top: env(safe-area-inset-top);
 
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: none;

@@ -1,66 +1,46 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { SourceBadge } from '@/lib/types';
 
 /**
- * Custom hook to manage source badge filtering
- * 
- * Features:
- * - Tracks available video sources
- * - Supports filtering by selected sources
- * - Auto-cleanup when sources no longer exist
+ * 视频源筛选 Hook（单选）
+ * - 同一时间最多选中一个视频源
+ * - 再次点击已选中的源即取消筛选（回到全部）
  */
 export function useSourceBadges<T extends { source?: string; sourceName?: string }>(
   videos: T[],
   availableSources: SourceBadge[]
 ) {
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
 
-  // Filter videos by selected sources
+  // 搜索过程中源列表会实时变化，选中的源不存在时自动回退为全部
+  const activeSource = selectedSource && availableSources.some((source) => source.id === selectedSource)
+    ? selectedSource
+    : null;
+
+  const selectedSources = useMemo(
+    () => new Set(activeSource ? [activeSource] : []),
+    [activeSource]
+  );
+
   const filteredVideos = useMemo(() => {
-    if (selectedSources.size === 0) {
-      return videos;
-    }
+    if (!activeSource) return videos;
+    return videos.filter((video) => video.source === activeSource);
+  }, [videos, activeSource]);
 
-    return videos.filter(video =>
-      video.source && selectedSources.has(video.source)
-    );
-  }, [videos, selectedSources]);
-
-  // Toggle source selection
   const toggleSource = useCallback((sourceId: string) => {
-    setSelectedSources(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(sourceId)) {
-        newSet.delete(sourceId);
-      } else {
-        newSet.add(sourceId);
-      }
-      return newSet;
-    });
+    setSelectedSource((prev) => (prev === sourceId ? null : sourceId));
   }, []);
 
-  // Auto-cleanup: remove selected sources that no longer exist
-  useEffect(() => {
-    const availableSourceIds = new Set(availableSources.map(s => s.id));
-
-    setSelectedSources(prev => {
-      const filtered = new Set(
-        Array.from(prev).filter(sourceId => availableSourceIds.has(sourceId))
-      );
-
-      // Only update if changed
-      if (filtered.size !== prev.size) {
-        return filtered;
-      }
-      return prev;
-    });
-  }, [availableSources]);
+  const clearSelection = useCallback(() => {
+    setSelectedSource(null);
+  }, []);
 
   return {
     selectedSources,
     filteredVideos,
     toggleSource,
+    clearSelection,
   };
 }

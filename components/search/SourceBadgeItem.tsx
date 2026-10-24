@@ -1,12 +1,12 @@
 /**
- * SourceBadgeItem - Individual source badge component
- * Displays a single video source badge with count, supports selection state
+ * SourceBadgeItem - 单个视频源标签
+ * 支持选中状态；count 为空时（如「全部」）不展示数量
  */
 
 interface SourceBadgeItemProps {
   id: string;
   name: string;
-  count: number;
+  count?: number;
   isSelected: boolean;
   onToggle: () => void;
   isFocused?: boolean;
@@ -29,6 +29,10 @@ export function SourceBadgeItem({
     onToggle();
   };
 
+  const ariaLabel = typeof count === 'number'
+    ? `${name} 视频源，${count} 个视频${isSelected ? '，已选中' : ''}`
+    : `${name}${isSelected ? '，已选中' : ''}`;
+
   return (
     <button
       type="button"
@@ -44,7 +48,7 @@ export function SourceBadgeItem({
       tabIndex={0}
       data-focusable
       aria-pressed={isSelected}
-      aria-label={`${name} 视频源，${count} 个视频${isSelected ? '，已选中' : ''}`}
+      aria-label={ariaLabel}
       className={`
         inline-flex items-center gap-1.5 px-4 py-2
         rounded-full
@@ -61,15 +65,17 @@ export function SourceBadgeItem({
       `}
     >
       <span>{name}</span>
-      <span className={`
-        px-2 py-0.5 rounded-full text-xs font-semibold
-        ${isSelected
-          ? 'bg-white/20 text-white'
-          : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
-        }
-      `}>
-        {count}
-      </span>
+      {typeof count === 'number' && (
+        <span className={`
+          px-2 py-0.5 rounded-full text-xs font-semibold
+          ${isSelected
+            ? 'bg-white/20 text-white'
+            : 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
+          }
+        `}>
+          {count}
+        </span>
+      )}
     </button>
   );
 }

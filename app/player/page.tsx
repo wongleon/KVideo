@@ -13,7 +13,6 @@ import { useResolutionProbe } from '@/lib/hooks/useResolutionProbe';
 import { setCachedResolution } from '@/lib/player/resolution-cache';
 import { useVideoPlayer } from '@/lib/hooks/useVideoPlayer';
 import { useHistory } from '@/lib/store/history-store';
-import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
 import { PlayerNavbar } from '@/components/player/PlayerNavbar';
 import { settingsStore } from '@/lib/store/settings-store';
@@ -565,9 +564,6 @@ function PlayerContent() {
           </div>
         )}
       </main>
-
-      {/* Favorites Sidebar - Left */}
-      <FavoritesSidebar isPremium={isPremium} />
     </div>
   );
 }

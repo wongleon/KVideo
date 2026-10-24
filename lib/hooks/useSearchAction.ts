@@ -80,6 +80,14 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                 targetSources.map((source: SearchSourceConfig) => [source.id, source])
             );
             const sourcesMap = new Map<string, { count: number; name: string; baseUrl?: string }>();
+            // 根据当前已返回的结果构建视频源统计
+            const buildAvailableSources = () =>
+                Array.from(sourcesMap.entries()).map(([id, info]) => ({
+                    id,
+                    name: info.name,
+                    count: info.count,
+                    ...(info.baseUrl ? { baseUrl: info.baseUrl } : {}),
+                }));
 
             await processSearchStream({
                 reader,
@@ -100,6 +108,9 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                             baseUrl: sourceConfigs.get(sourceId)?.baseUrl,
                         });
                     }
+
+                    // 搜索过程中实时更新视频源，便于展示实时源筛选
+                    setAvailableSources(buildAvailableSources());
                 },
                 onProgress: (completed, found) => {
                     setCompletedSources(completed);
@@ -112,12 +123,7 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                     setLoading(false);
 
                     // Update available sources with correct property names
-                    const sources = Array.from(sourcesMap.entries()).map(([id, info]) => ({
-                        id: id,
-                        name: info.name,
-                        count: info.count,
-                        ...(info.baseUrl ? { baseUrl: info.baseUrl } : {}),
-                    }));
+                    const sources = buildAvailableSources();
                     setAvailableSources(sources);
 
                     // Apply final sorting after all results are received
@@ -214,8 +220,11 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
     const cancelSearch = useCallback(() => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
+            abortControllerRef.current = null;
         }
-    }, []);
+        // 用户主动取消：结束加载态，仅保留当前已收到的搜索结果
+        setLoading(false);
+    }, [setLoading]);
 
     return { performSearch, loadMore, cancelSearch };
 }

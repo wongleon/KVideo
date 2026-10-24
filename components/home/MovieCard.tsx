@@ -28,7 +28,7 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
 
   return (
     <Link
-      href={`/?q=${encodeURIComponent(movie.title)}`}
+      href={`/search?q=${encodeURIComponent(movie.title)}`}
       onClick={(e) => {
         // Allow default behavior for modifier keys (new tab, etc.)
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -37,7 +37,7 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
         onMovieClick(movie);
       }}
       data-focusable
-      className="group cursor-pointer hover:translate-y-[-2px] transition-transform duration-200 ease-out"
+      className="group block cursor-pointer hover:translate-y-[-2px] transition-transform duration-200 ease-out"
       style={{
         position: 'relative',
         zIndex: 1,
@@ -46,15 +46,16 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
       onMouseEnter={(e) => (e.currentTarget.style.zIndex = '100')}
       onMouseLeave={(e) => (e.currentTarget.style.zIndex = '1')}
     >
-      <Card hover={false} className="p-0 h-full shadow-[0_2px_8px_var(--shadow-color)] hover:shadow-[0_8px_24px_var(--shadow-color)] transition-shadow duration-200 ease-out" blur={false}>
-        <div className="relative aspect-[2/3] bg-[var(--glass-bg)] rounded-[var(--radius-2xl)]">
+      <Card hover={false} className="p-0! relative overflow-hidden border-0! rounded-xl! shadow-[0_2px_8px_var(--shadow-color)] hover:shadow-[0_8px_24px_var(--shadow-color)] transition-shadow duration-200 ease-out" blur={false}>
+        {/* 海报 */}
+        <div className="relative aspect-[5/8] bg-[var(--glass-bg)]">
           {!imageError ? (
             <Image
               src={movie.cover}
               alt={movie.title}
               fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105 rounded-[var(--radius-2xl)]"
-              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 20vw"
               loading="eager"
               unoptimized
               referrerPolicy="no-referrer"
@@ -65,13 +66,13 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
               src="/placeholder-poster.svg"
               alt={movie.title}
               fill
-              className="object-cover rounded-[var(--radius-2xl)]"
-              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+              className="object-cover"
+              sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 20vw"
               unoptimized
               onError={() => setFallbackError(true)}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-[var(--glass-bg)] rounded-[var(--radius-2xl)]">
+            <div className="w-full h-full flex items-center justify-center bg-[var(--glass-bg)]">
               <p className="text-sm text-[var(--text-muted)]">暂无图片</p>
             </div>
           )}
@@ -92,12 +93,13 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
             </div>
           )}
         </div>
-        <div className="pt-3">
-          <h3 className="font-semibold text-sm text-center text-[var(--text-color)] line-clamp-2 group-hover:text-[var(--accent-color)] transition-colors">
-            {movie.title}
-          </h3>
-        </div>
       </Card>
+      {/* 名称：放在卡片外部，与海报左对齐 */}
+      <div className="pt-2">
+        <h3 className="font-semibold text-sm text-left text-[var(--text-color)] line-clamp-2 group-hover:text-[var(--accent-color)] transition-colors">
+          {movie.title}
+        </h3>
+      </div>
     </Link>
   );
 });

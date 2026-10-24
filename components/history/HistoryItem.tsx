@@ -93,9 +93,9 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-col gap-1 self-start opacity-0 group-hover:opacity-100 transition-opacity">
-            {/* Favorite button */}
+          {/* Actions - 横向排列并上下居中 */}
+          <div className="flex items-center gap-1.5 self-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            {/* Favorite button - 左侧 */}
             <FavoriteButton
               videoId={item.videoId}
               source={item.source}
@@ -103,23 +103,23 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
               poster={item.poster}
               remarks={episodeText}
               sourceMap={item.sourceMap}
-              size={14}
-              className="!p-1.5 !bg-transparent !border-0 !shadow-none hover:!bg-[var(--glass-bg)]"
+              size={18}
+              className="!p-2 !bg-transparent !border-0 !shadow-none hover:!bg-[var(--glass-bg)]"
               showTooltip={false}
               isPremium={isPremium}
             />
 
-            {/* Delete button */}
+            {/* Delete button - 右侧，尺寸稍大 */}
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 onRemove();
               }}
-              className="p-1.5 hover:bg-[var(--glass-bg)] rounded-full cursor-pointer"
+              className="p-2.5 hover:bg-[var(--glass-bg)] rounded-full cursor-pointer"
               aria-label="删除"
             >
-              <Icons.Trash size={14} className="text-[var(--text-color-secondary)]" />
+              <Icons.Trash size={20} className="text-[var(--text-color-secondary)]" />
             </button>
           </div>
         </div>

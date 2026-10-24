@@ -38,7 +38,7 @@ export function BackToTop() {
     return (
         <button
             onClick={scrollToTop}
-            className={`fixed bottom-8 right-8 z-[9999] p-3 rounded-full 
+            className={`fixed bottom-24 md:bottom-8 right-8 z-[9999] p-3 rounded-full 
                         bg-[var(--glass-bg)] border border-[var(--glass-border)] 
                         shadow-[var(--shadow-md)] backdrop-blur-xl 
                         text-[var(--text-color)] transition-all duration-300 ease-out

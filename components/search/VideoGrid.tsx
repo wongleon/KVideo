@@ -70,10 +70,6 @@ export const VideoGrid = memo(function VideoGrid({
     return () => unsubscribe();
   }, [pathname, searchParams, videos.length]);
 
-  if (videos.length === 0) {
-    return null;
-  }
-
   // Build stable list of videos to probe for resolution
   const videosToProbe = useMemo(() => {
     if (displayMode === 'grouped') {
@@ -186,6 +182,11 @@ export const VideoGrid = memo(function VideoGrid({
   const { resolutions, isProbing } = useResolutionProbe(probeList);
 
   const totalItems = displayMode === 'grouped' ? groupItems.length : videoItems.length;
+
+  // 空结果直接返回（必须放在所有 Hook 之后，避免 Hook 数量变化）
+  if (videos.length === 0) {
+    return null;
+  }
 
   return (
     <>
