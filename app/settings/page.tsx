@@ -59,8 +59,6 @@ export default function SettingsPage() {
     videoTogetherEnabled,
     handleRememberScrollPositionChange,
     handleVideoTogetherEnabledChange,
-    locale,
-    handleLocaleChange,
     danmakuApiUrl,
     handleDanmakuApiUrlChange,
     danmakuOpacity,
@@ -110,8 +108,6 @@ export default function SettingsPage() {
           onRealtimeLatencyChange={handleRealtimeLatencyChange}
           onSearchDisplayModeChange={handleSearchDisplayModeChange}
           onRememberScrollPositionChange={handleRememberScrollPositionChange}
-          locale={locale}
-          onLocaleChange={handleLocaleChange}
           blockedCategories={blockedCategories}
           onBlockedCategoriesChange={handleBlockedCategoriesChange}
         />

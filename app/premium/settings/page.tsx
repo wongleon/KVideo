@@ -37,8 +37,6 @@ export default function PremiumSettingsPage() {
         handleProxyModeChange,
         handleSeekStepSecondsChange,
         handleRememberScrollPositionChange,
-        locale,
-        handleLocaleChange,
         // Danmaku settings
         danmakuApiUrl,
         handleDanmakuApiUrlChange,
@@ -108,8 +106,6 @@ export default function PremiumSettingsPage() {
                     onRealtimeLatencyChange={handleRealtimeLatencyChange}
                     onSearchDisplayModeChange={handleSearchDisplayModeChange}
                     onRememberScrollPositionChange={handleRememberScrollPositionChange}
-                    locale={locale}
-                    onLocaleChange={handleLocaleChange}
                     blockedCategories={blockedCategories}
                     onBlockedCategoriesChange={handleBlockedCategoriesChange}
                 />
