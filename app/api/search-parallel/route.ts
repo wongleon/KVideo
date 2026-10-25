@@ -92,7 +92,8 @@ export async function POST(request: NextRequest) {
                 type: 'videos',
                 videos: videos.map((video: any) => ({
                   ...video,
-                  sourceDisplayName: getSourceName(source.id),
+                  // 优先使用源配置中的名称，未配置时回退到内置映射表
+                  sourceDisplayName: source.name?.trim() || getSourceName(source.id),
                   latency,
                 })),
                 source: source.id,
@@ -131,7 +132,8 @@ export async function POST(request: NextRequest) {
                       type: 'videos',
                       videos: pageVideos.map((video: any) => ({
                         ...video,
-                        sourceDisplayName: getSourceName(source.id),
+                        // 优先使用源配置中的名称，未配置时回退到内置映射表
+                        sourceDisplayName: source.name?.trim() || getSourceName(source.id),
                         latency,
                       })),
                       source: source.id,

@@ -274,7 +274,7 @@ export function DesktopSpeedMenu({
                 onClick={handleToggle}
                 onMouseEnter={onMouseEnter}
                 onMouseLeave={onMouseLeave}
-                className="group flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-95 text-white/90 font-medium text-xs sm:text-sm"
+                className="btn-icon shrink-0 text-sm sm:text-base font-medium"
                 aria-label="播放速度"
             >
                 {playbackRate}x

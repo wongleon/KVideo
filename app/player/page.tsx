@@ -162,10 +162,25 @@ function PlayerContent() {
       sources.unshift({
         id: videoId || '',
         source,
-        sourceName: getSourceName(source),
         pic: videoData?.vod_pic,
       });
     }
+
+    // 统一补齐线路名称：优先使用源配置里的 name，其次回退到内置映射表。
+    // 缓存或 URL 带过来的旧线路可能缺少 sourceName，避免直接显示成 ID。
+    const settings = settingsStore.getSettings();
+    const configSources = isPremium ? settings.premiumSources : settings.sources;
+    const configuredNames = new Map<string, string>(
+      (configSources ?? []).map((item) => [item.id, item.name])
+    );
+
+    sources = sources.map((item) => ({
+      ...item,
+      sourceName:
+        item.sourceName?.trim() ||
+        configuredNames.get(item.source)?.trim() ||
+        getSourceName(item.source),
+    }));
 
     const fallbackPic = videoData?.vod_pic;
     if (fallbackPic) {
@@ -173,7 +188,7 @@ function PlayerContent() {
     }
 
     return sources;
-  }, [discoveredSources, groupedSourcesParam, gsKey, source, videoData?.vod_pic, videoId]);
+  }, [discoveredSources, groupedSourcesParam, gsKey, source, videoData?.vod_pic, videoId, isPremium]);
 
   useEffect(() => {
     groupedSourcesRef.current = groupedSources;
@@ -459,6 +474,7 @@ function PlayerContent() {
                 <VideoMetadata
                   videoData={videoData}
                   source={source}
+                  sourceName={groupedSources.find((item) => item.source === source)?.sourceName}
                   title={title}
                 />
                 {videoData && videoId && source && (

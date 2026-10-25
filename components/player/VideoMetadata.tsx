@@ -18,10 +18,11 @@ function splitPersonNames(str: string): string[] {
 interface VideoMetadataProps {
   videoData: any;
   source: string | null;
+  sourceName?: string;
   title?: string | null;
 }
 
-export function VideoMetadata({ videoData, source, title }: VideoMetadataProps) {
+export function VideoMetadata({ videoData, source, sourceName, title }: VideoMetadataProps) {
   const description = htmlToText(videoData?.vod_content);
 
   return (
@@ -60,7 +61,7 @@ export function VideoMetadata({ videoData, source, title }: VideoMetadataProps) 
             {source && (
               <Badge variant="primary" className="backdrop-blur-md">
                 <Icons.Check size={14} className="mr-1" />
-                {getSourceName(source)}
+                {sourceName || getSourceName(source)}
               </Badge>
             )}
             {videoData?.type_name && (
