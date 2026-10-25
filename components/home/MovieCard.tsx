@@ -56,7 +56,7 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
               fill
               className="object-cover transition-transform duration-300 md:group-hover:scale-105"
               sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 20vw"
-              loading="eager"
+              loading="lazy"
               unoptimized
               referrerPolicy="no-referrer"
               onError={() => setImageError(true)}

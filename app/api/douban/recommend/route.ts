@@ -37,9 +37,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(data, {
       headers: {
-        // CDN（如 Netlify）的缓存键可能不区分为 query 参数，
-        // 使用 private 禁止共享缓存，避免不同标签互相覆盖数据
-        'Cache-Control': 'private, max-age=60',
+        // 允许 CDN 缓存以提升首屏速度；同时声明 query 参与缓存键，
+        // 避免不同标签共用同一份缓存导致数据串位
+        'Cache-Control': 'public, max-age=0, s-maxage=86400, stale-while-revalidate=3600',
+        'Netlify-Vary': 'query',
       },
     });
   } catch (error) {
