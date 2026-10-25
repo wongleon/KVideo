@@ -8,6 +8,7 @@ interface DesktopOverlayWrapperProps {
     isFullscreen: boolean;
     fullscreenClock: string;
     isRotated?: boolean;
+    onBack?: () => void;
     onTogglePlay: () => void;
     onSkipForward: () => void;
     onSkipBackward: () => void;
@@ -20,14 +21,15 @@ interface DesktopOverlayWrapperProps {
     onMoreMenuMouseLeave: () => void;
     onCopyLink: (type?: 'original' | 'proxy') => void;
     seekStepSeconds: number;
-    // Speed Menu Props
-    playbackRate: number;
-    showSpeedMenu: boolean;
-    speeds: number[];
-    onToggleSpeedMenu: () => void;
-    onSpeedChange: (speed: number) => void;
-    onSpeedMenuMouseEnter: () => void;
-    onSpeedMenuMouseLeave: () => void;
+    // 右上角快捷入口
+    isPiPSupported: boolean;
+    onTogglePictureInPicture: () => void;
+    isCastAvailable: boolean;
+    onShowCastMenu: () => void;
+    isAirPlaySupported: boolean;
+    onShowAirPlayMenu: () => void;
+    isWebFullscreen: boolean;
+    onToggleWebFullscreen: () => void;
     webFullscreenSize: 'full' | 'large' | 'focused';
     onCycleWebFullscreenSize: () => void;
     containerRef: React.RefObject<HTMLDivElement | null>;
@@ -39,6 +41,7 @@ export function DesktopOverlayWrapper({
     isFullscreen,
     fullscreenClock,
     isRotated = false,
+    onBack,
     onTogglePlay,
     onSkipForward,
     onSkipBackward,
@@ -51,13 +54,14 @@ export function DesktopOverlayWrapper({
     onMoreMenuMouseLeave,
     onCopyLink,
     seekStepSeconds,
-    playbackRate,
-    showSpeedMenu,
-    speeds,
-    onToggleSpeedMenu,
-    onSpeedChange,
-    onSpeedMenuMouseEnter,
-    onSpeedMenuMouseLeave,
+    isPiPSupported,
+    onTogglePictureInPicture,
+    isCastAvailable,
+    onShowCastMenu,
+    isAirPlaySupported,
+    onShowAirPlayMenu,
+    isWebFullscreen,
+    onToggleWebFullscreen,
     webFullscreenSize,
     onCycleWebFullscreenSize,
     containerRef,
@@ -102,17 +106,19 @@ export function DesktopOverlayWrapper({
             onMoreMenuMouseLeave={onMoreMenuMouseLeave}
             onCopyLink={onCopyLink}
             seekStepSeconds={seekStepSeconds}
-            playbackRate={playbackRate}
-            showSpeedMenu={showSpeedMenu}
-            speeds={speeds}
-            onToggleSpeedMenu={onToggleSpeedMenu}
-            onSpeedChange={onSpeedChange}
-            onSpeedMenuMouseEnter={onSpeedMenuMouseEnter}
-            onSpeedMenuMouseLeave={onSpeedMenuMouseLeave}
+            isPiPSupported={isPiPSupported}
+            onTogglePictureInPicture={onTogglePictureInPicture}
+            isCastAvailable={isCastAvailable}
+            onShowCastMenu={onShowCastMenu}
+            isAirPlaySupported={isAirPlaySupported}
+            onShowAirPlayMenu={onShowAirPlayMenu}
+            isWebFullscreen={isWebFullscreen}
+            onToggleWebFullscreen={onToggleWebFullscreen}
             webFullscreenSize={webFullscreenSize}
             onCycleWebFullscreenSize={onCycleWebFullscreenSize}
             containerRef={containerRef}
             isRotated={isRotated}
+            onBack={onBack}
         />
     );
 }

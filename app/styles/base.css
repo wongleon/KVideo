@@ -24,6 +24,11 @@ html {
     scroll-behavior: auto;
 }
 
+/* 品牌标题字体：优先圆润字体，缺失时回退系统字体 */
+.font-brand {
+    font-family: "Yuanti SC", "YouYuan", "HanziPen SC", "Hannotate SC", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
 /* Focus Styles */
 *:focus-visible {
     outline: 2px solid var(--accent-color);

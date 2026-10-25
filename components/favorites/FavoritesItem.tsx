@@ -5,7 +5,6 @@
 
 import { Icons } from '@/components/ui/Icon';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
-import { formatDate } from '@/lib/utils/format-utils';
 import { getSourceName } from '@/lib/utils/source-names';
 import { storeGroupedSources } from '@/lib/utils/grouped-sources-cache';
 import type { FavoriteItem } from '@/lib/types';
@@ -51,7 +50,7 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
     };
 
     return (
-        <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-[var(--radius-2xl)] p-3 hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
+        <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-lg overflow-hidden hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
             <a
                 href={getVideoUrl()}
                 onClick={(e) => {
@@ -64,14 +63,14 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
                 onAuxClick={(e) => handleClick(e as any)}
                 className="block"
             >
-                <div className="flex gap-3">
-                    {/* Poster - Same size as HistoryItem */}
-                    <div className="relative w-28 h-16 flex-shrink-0 bg-[var(--glass-bg)] rounded-[var(--radius-2xl)] overflow-hidden">
+                <div className="flex items-stretch gap-3">
+                    {/* Poster：竖版，上下贴边、与左侧边框无间距 */}
+                    <div className="relative w-16 self-stretch flex-shrink-0 bg-[var(--glass-bg)] overflow-hidden">
                         {item.poster ? (
                             <img
                                 src={item.poster}
                                 alt={item.title}
-                                className="w-full h-full object-cover"
+                                className="absolute inset-0 w-full h-full object-cover"
                                 referrerPolicy="no-referrer"
                                 onError={(e) => {
                                     const target = e.currentTarget as HTMLImageElement;
@@ -86,27 +85,24 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
                     </div>
 
                     {/* Info */}
-                    <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-[var(--text-color)] truncate group-hover:text-[var(--accent-color)] transition-colors mb-1">
+                    <div className="flex-1 min-w-0 flex flex-col justify-start gap-1.5 pt-2 pb-3">
+                        <h3 className="text-base font-medium text-[var(--text-color)] truncate group-hover:text-[var(--accent-color)] transition-colors">
                             {item.title}
                         </h3>
                         {item.year && (
-                            <p className="text-xs text-[var(--text-color-secondary)] mb-1">
+                            <p className="text-xs text-[var(--text-color-secondary)]">
                                 {item.year}
                             </p>
                         )}
-                        <div className="flex items-center justify-between text-xs text-[var(--text-color-secondary)]">
-                            {item.remarks && (
+                        {item.remarks && (
+                            <div className="flex items-center text-xs text-[var(--text-color-secondary)]">
                                 <span className="truncate">{item.remarks}</span>
-                            )}
-                            <span className="flex-shrink-0">
-                                {formatDate(item.addedAt)}
-                            </span>
-                        </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Actions - 横向排列并上下居中 */}
-                    <div className="flex items-center gap-1.5 self-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1.5 self-center pr-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         {/* Favorite button - 左侧 */}
                         <FavoriteButton
                             videoId={item.videoId}

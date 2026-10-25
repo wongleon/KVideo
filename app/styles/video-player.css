@@ -97,8 +97,9 @@
 .slider-thumb {
     position: absolute;
     top: 50%;
-    width: 16px;
-    height: 16px;
+    display: none;
+    width: 12px;
+    height: 12px;
     background-color: white;
     border-radius: var(--radius-full);
     transform: translate(-50%, -50%);
@@ -441,11 +442,37 @@
 }
 
 /*
+ * 左右快退/快进按钮：内边距与控制条保持一致，保证与控制条按钮左右对齐
+ */
+.kvideo-container .player-side-skip {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+@container (max-width: 36rem) {
+    .kvideo-container .player-side-skip {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+}
+
+/* 播放器边缘按钮（快退/快进/返回/右上角按钮组）：内边距保持一致，保证左右边缘对齐 */
+.kvideo-container .player-edge-padding {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/*
  * Keep fullscreen actions visible when the player itself becomes narrow.
  * Container queries are used instead of viewport queries because the player
  * can also be narrow inside the desktop player/sidebar grid.
  */
 @container (max-width: 36rem) {
+    .kvideo-container .player-edge-padding {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
     .kvideo-container .player-controls-bar {
         padding: 0.5rem;
     }

@@ -14,10 +14,11 @@ import { setCachedResolution } from '@/lib/player/resolution-cache';
 import { useVideoPlayer } from '@/lib/hooks/useVideoPlayer';
 import { useHistory } from '@/lib/store/history-store';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
-import { PlayerNavbar } from '@/components/player/PlayerNavbar';
+import { MobileVideoInfo } from '@/components/player/MobileVideoInfo';
+import { YouMayAlsoLike } from '@/components/player/YouMayAlsoLike';
+import { htmlToText } from '@/lib/utils/html';
 import { settingsStore } from '@/lib/store/settings-store';
 import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { getSourceName } from '@/lib/utils/source-names';
 import { retrieveGroupedSources, storeGroupedSources } from '@/lib/utils/grouped-sources-cache';
 
@@ -25,11 +26,6 @@ type PlayerViewportMode = 'standard' | 'wide' | 'cinema';
 
 const PLAYER_VIEWPORT_MODE_KEY = 'kvideo-player-viewport-mode';
 const PLAYER_VIEWPORT_MODE_ORDER: PlayerViewportMode[] = ['standard', 'wide', 'cinema'];
-const PLAYER_VIEWPORT_MODE_LABELS: Record<PlayerViewportMode, string> = {
-  standard: '标准',
-  wide: '宽屏',
-  cinema: '影院',
-};
 
 function PlayerContent() {
   const searchParams = useSearchParams();
@@ -52,9 +48,8 @@ function PlayerContent() {
     typeof window !== 'undefined' ? modeStore.getSettings().episodeReverseOrder : false
   );
 
-  // Mobile tab state
-  const [activeTab, setActiveTab] = useState<'episodes' | 'info'>('episodes');
-  const [playerViewportMode, setPlayerViewportMode] = useState<PlayerViewportMode>(() => {
+  // 播放窗口大小（沿用本地已保存的偏好，桌面端切换入口已移除）
+  const [playerViewportMode] = useState<PlayerViewportMode>(() => {
     if (typeof window === 'undefined') return 'standard';
     const saved = localStorage.getItem(PLAYER_VIEWPORT_MODE_KEY);
     return saved === 'wide' || saved === 'cinema' || saved === 'standard' ? saved : 'standard';
@@ -402,10 +397,7 @@ function PlayerContent() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-color)]">
-      {/* Glass Navbar */}
-      <PlayerNavbar isPremium={isPremium} />
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-2">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-3">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-[var(--accent-color)] border-t-transparent mb-4"></div>
@@ -419,33 +411,11 @@ function PlayerContent() {
           />
         ) : (
           <div className="space-y-4">
-            {/* Viewport controls span full content width so player + sidebar tops align */}
-            <div className="hidden lg:flex items-center justify-between gap-4 rounded-[var(--radius-2xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
-              <div>
-                <div className="text-sm font-semibold text-[var(--text-color)]">
-                  播放窗口大小
-                </div>
-                <div className="text-xs text-[var(--text-color-secondary)] mt-1">
-                  右侧源列表或选集折叠后，会自动提升到更宽的布局
-                  {effectivePlayerViewportMode !== playerViewportMode && `，当前已自动切到${PLAYER_VIEWPORT_MODE_LABELS[effectivePlayerViewportMode]}`}
-                </div>
-              </div>
-              <SegmentedControl<PlayerViewportMode>
-                options={[
-                  { label: '标准', value: 'standard' },
-                  { label: '宽屏', value: 'wide' },
-                  { label: '影院', value: 'cinema' },
-                ]}
-                value={playerViewportMode}
-                onChange={setPlayerViewportMode}
-                className="min-w-[240px]"
-              />
-            </div>
-
-          <div className={`grid gap-6 lg:grid-cols-3 lg:items-start ${playerGridClass}`}>
+          <div className={`grid min-w-0 gap-2 lg:gap-6 lg:grid-cols-3 lg:items-start ${playerGridClass}`}>
             {/* Video Player Section */}
-            <div className="lg:col-span-2 xl:col-span-1 space-y-6">
-              <div className="sm:mx-0">
+            <div className="min-w-0 lg:col-span-2 xl:col-span-1 space-y-4 lg:space-y-6">
+              {/* 移动端滚动时播放器固定在顶部 */}
+              <div className="max-lg:fixed max-lg:inset-x-0 max-lg:top-[env(safe-area-inset-top)] max-lg:z-40">
                 <VideoPlayer
                   playUrl={playUrl}
                   videoId={videoId || undefined}
@@ -461,63 +431,61 @@ function PlayerContent() {
                   onResolutionDetected={handleResolutionDetected}
                 />
               </div>
-              <div className="hidden lg:block">
+
+              {/* 固定播放器脱离文档流后的高度占位 */}
+              <div className="h-[calc(56.25vw+env(safe-area-inset-top))] lg:hidden" aria-hidden="true" />
+
+              {/* 移动端信息区：标题 / 标签 / 简介 / 收藏 */}
+              <MobileVideoInfo
+                title={videoData?.vod_name || title || ''}
+                year={videoData?.vod_year}
+                area={videoData?.vod_area}
+                lang={videoData?.vod_lang}
+                typeName={videoData?.type_name}
+                description={htmlToText(videoData?.vod_content)}
+                favorite={videoData && videoId && source ? {
+                  videoId,
+                  source,
+                  poster: videoData.vod_pic,
+                  sourceMap: Object.fromEntries(
+                    (groupedSources.length > 0 ? groupedSources : [{ id: videoId, source }]).map((item) => [item.source, item.id])
+                  ),
+                  isPremium,
+                } : undefined}
+              />
+
+              {/* 桌面端信息卡片，收藏按钮定位在卡片右上角 */}
+              <div className="hidden lg:block relative">
                 <VideoMetadata
                   videoData={videoData}
                   source={source}
                   title={title}
                 />
+                {videoData && videoId && source && (
+                  <div className="absolute top-4 right-4 md:top-6 md:right-6">
+                    <FavoriteButton
+                      videoId={videoId}
+                      source={source}
+                      title={videoData.vod_name || title || '未知视频'}
+                      poster={videoData.vod_pic}
+                      type={videoData.type_name}
+                      year={videoData.vod_year}
+                      sourceMap={Object.fromEntries(
+                        (groupedSources.length > 0 ? groupedSources : [{ id: videoId, source }]).map((item) => [item.source, item.id])
+                      )}
+                      size={20}
+                      isPremium={isPremium}
+                    />
+                  </div>
+                )}
               </div>
-
-              {/* Favorite Button for current video */}
-              {videoData && videoId && (
-                <div className="flex items-center gap-3 mt-4">
-                  <FavoriteButton
-                    videoId={videoId}
-                    source={source}
-                    title={videoData.vod_name || title || '未知视频'}
-                    poster={videoData.vod_pic}
-                    type={videoData.type_name}
-                    year={videoData.vod_year}
-                    sourceMap={Object.fromEntries(
-                      (groupedSources.length > 0 ? groupedSources : [{ id: videoId, source }]).map((item) => [item.source, item.id])
-                    )}
-                    size={20}
-                    isPremium={isPremium}
-                  />
-                  <span className="text-sm text-[var(--text-color-secondary)]">
-                    收藏这个视频
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* Sidebar with sticky wrapper — top offset matches navbar height for alignment */}
-            <div className="lg:col-span-1">
+            <div className="min-w-0 lg:col-span-1 max-lg:-mt-2">
               <div className="lg:sticky lg:top-28 space-y-6">
-                {/* Mobile Tabs */}
-                <SegmentedControl
-                  options={[
-                    { label: '选集', value: 'episodes' },
-                    { label: '简介', value: 'info' },
-                  ]}
-                  value={activeTab}
-                  onChange={setActiveTab}
-                  className="lg:hidden mb-4"
-                />
-
-                {/* Info Tab Content - Mobile Only */}
-                <div className={activeTab !== 'info' ? 'hidden' : 'block lg:hidden'}>
-                  <VideoMetadata
-                    videoData={videoData}
-                    source={source}
-                    title={title}
-                  />
-                </div>
-
-                {/* Episode List with integrated source selector - Visible if desktop OR active mobile tab */}
-                <div className={activeTab !== 'episodes' ? 'hidden lg:block' : 'block'}>
-                  <EpisodeList
+                {/* 选集与线路选择（移动端常显，桌面端位于侧栏） */}
+                <EpisodeList
                     episodes={videoData?.episodes || null}
                     currentEpisode={currentEpisode}
                     isReversed={isReversed}
@@ -556,11 +524,18 @@ function PlayerContent() {
                       setCurrentSourceId(newSource.source);
                       router.replace(`/player?${params.toString()}`, { scroll: false });
                     }}
-                  />
-                </div>
+                />
               </div>
             </div>
           </div>
+
+          {/* 猜你喜欢：基于当前视频类型 / 演员 / 地区推荐 */}
+          <YouMayAlsoLike
+            title={videoData?.vod_name || title || ''}
+            typeName={videoData?.type_name}
+            actors={videoData?.vod_actor}
+            area={videoData?.vod_area}
+          />
           </div>
         )}
       </main>

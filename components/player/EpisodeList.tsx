@@ -2,7 +2,6 @@
 
 import { useRef, useCallback, useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
-import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icons } from '@/components/ui/Icon';
 import { LatencyBadge } from '@/components/ui/LatencyBadge';
@@ -27,6 +26,24 @@ export interface SourceInfo {
   pic?: string;
   typeName?: string;
   remarks?: string;
+}
+
+// 将鼠标垂直滚轮转为横向滚动，返回解绑函数
+function bindHorizontalWheelScroll(element: HTMLElement): () => void {
+  const handleWheel = (event: WheelEvent) => {
+    const { overflowX } = window.getComputedStyle(element);
+    // 仅在容器可横向滚动时接管，避免影响桌面端的纵向滚动
+    if (overflowX === 'hidden' || overflowX === 'visible') return;
+    if (element.scrollWidth - element.clientWidth <= 0) return;
+    // 触控板横向手势交给浏览器默认处理
+    if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+
+    event.preventDefault();
+    element.scrollLeft += event.deltaY;
+  };
+
+  element.addEventListener('wheel', handleWheel, { passive: false });
+  return () => element.removeEventListener('wheel', handleWheel);
 }
 
 interface EpisodeListProps {
@@ -66,12 +83,13 @@ export function EpisodeList({
   onEpisodeSectionCollapseChange,
 }: EpisodeListProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const sourceRailRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const sourceItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [sourceExpanded, setSourceExpanded] = useState(false);
   const [showAllSources, setShowAllSources] = useState(false);
   // list = classic vertical list; grid = multi-column with section pages
-  const [episodeLayout, setEpisodeLayout] = useState<'list' | 'grid'>('grid');
+  const [episodeLayout] = useState<'list' | 'grid'>('grid');
   const [episodePage, setEpisodePage] = useState(0);
 
   const EPISODES_PER_PAGE = 50;
@@ -81,6 +99,20 @@ export function EpisodeList({
   const [isLoadingLatency, setIsLoadingLatency] = useState(false);
 
   const showSourceSelector = sources && sources.length > 1 && onSourceChange;
+
+  // 线路胶囊：支持鼠标滚轮横向滚动
+  useEffect(() => {
+    const element = sourceRailRef.current;
+    if (!element) return;
+    return bindHorizontalWheelScroll(element);
+  }, [showSourceSelector, sources?.length]);
+
+  // 选集横滑：支持鼠标滚轮横向滚动
+  useEffect(() => {
+    const element = listRef.current;
+    if (!element) return;
+    return bindHorizontalWheelScroll(element);
+  }, [episodeSectionCollapsed]);
 
   // Helper: get best resolution badge for a source
   const getResBadge = useCallback((source: SourceInfo, isCurrent: boolean) => {
@@ -252,16 +284,11 @@ export function EpisodeList({
     setEpisodePage(Math.min(Math.max(0, page), Math.max(0, Math.ceil(episodes.length / EPISODES_PER_PAGE) - 1)));
   }, [currentEpisode, episodes, isReversed, episodeLayout]);
 
+  // 移动端横向滑动需要完整列表，桌面端分页通过 CSS 控制显隐
   const pagedEpisodes = useMemo(() => {
     if (!displayEpisodes) return null;
-    if (episodeLayout === 'list' || displayEpisodes.length <= EPISODES_PER_PAGE) {
-      return displayEpisodes.map((episode, displayIndex) => ({ episode, displayIndex }));
-    }
-    const start = episodePage * EPISODES_PER_PAGE;
-    return displayEpisodes
-      .slice(start, start + EPISODES_PER_PAGE)
-      .map((episode, offset) => ({ episode, displayIndex: start + offset }));
-  }, [displayEpisodes, episodeLayout, episodePage]);
+    return displayEpisodes.map((episode, displayIndex) => ({ episode, displayIndex }));
+  }, [displayEpisodes]);
 
   const pageRangeLabels = useMemo(() => {
     if (!displayEpisodes) return [] as string[];
@@ -310,16 +337,75 @@ export function EpisodeList({
     }, [episodes, onEpisodeClick, getOriginalIndex]),
   });
 
-  const showReverseToggle = episodes && episodes.length > 1;
+  // 横向滑动场景下自动将当前集滚动到可见区域
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container || episodeSectionCollapsed) return;
+    // 仅在内容横向溢出（移动端横滑）时执行，避免影响桌面端布局
+    if (container.scrollWidth <= container.clientWidth) return;
+
+    const frame = requestAnimationFrame(() => {
+      buttonRefs.current[getDisplayIndex(currentEpisode)]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [currentEpisode, episodeSectionCollapsed, getDisplayIndex]);
+
   const currentEpisodeLabel = episodes?.[currentEpisode]?.name || `第${currentEpisode + 1}集`;
 
+  // 选集标题：移动端置于卡片外，桌面端保留在卡片内
+  const episodeHeader = (
+    <div className="text-lg sm:text-xl font-bold text-[var(--text-color)] mb-4 flex items-center gap-2 flex-wrap">
+      <span>选集</span>
+      {episodes && (
+        <Badge variant="primary">{episodes.length}</Badge>
+      )}
+    </div>
+  );
+
   return (
-    <Card hover={false}>
+    <>
+      {/* 移动端：选集标题置于卡片外，位于线路胶囊上方 */}
+      <div className="lg:hidden">{episodeHeader}</div>
+
+      {/* 移动端：线路胶囊，横向滚动切换（卡片外） */}
       {showSourceSelector && (
-        <div className="mb-4">
+        <div ref={sourceRailRef} className="lg:hidden mb-4 flex gap-2 overflow-x-auto scrollbar-hide">
+          {sortedSources.map((source) => {
+            const isCurrent = source.source === currentSource;
+
+            return (
+              <button
+                key={source.source}
+                onClick={() => {
+                  if (!isCurrent) onSourceChange!(source);
+                }}
+                className={`
+                  flex-shrink-0 px-4 py-2 rounded-[var(--radius-full)] text-sm font-medium transition-all duration-200 cursor-pointer
+                  ${isCurrent
+                    ? 'bg-[var(--accent-color)] text-white'
+                    : 'bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)]'
+                  }
+                `}
+                aria-current={isCurrent ? 'true' : undefined}
+              >
+                {source.sourceName || source.source}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 移动端不显示卡片外观，桌面端保持原有卡片样式 */}
+      <div className="relative lg:bg-[var(--glass-bg)] lg:rounded-[var(--radius-2xl)] lg:shadow-[0_2px_8px_var(--shadow-color)] lg:border lg:border-[var(--glass-border)] lg:p-6">
+      {showSourceSelector && (
+        <div className="hidden lg:block mb-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="flex items-center gap-2 min-w-0">
-              <Icons.Layers size={18} className="text-[var(--text-color)]" />
               <span className="text-base sm:text-lg font-semibold text-[var(--text-color)]">
                 源列表
               </span>
@@ -598,63 +684,11 @@ export function EpisodeList({
         </div>
       )}
 
-      <div className="text-lg sm:text-xl font-bold text-[var(--text-color)] mb-4 flex items-center gap-2 flex-wrap">
-        <Icons.List size={20} className="sm:w-6 sm:h-6" />
-        <span>选集</span>
-        {episodes && (
-          <Badge variant="primary">{episodes.length}</Badge>
-        )}
-        <div className="ml-auto flex items-center gap-1.5">
-          {/* Layout toggle */}
-          {showReverseToggle && !episodeSectionCollapsed && (
-            <button
-              onClick={() => setEpisodeLayout((current) => (current === 'grid' ? 'list' : 'grid'))}
-              className={`
-                p-1.5 rounded-[var(--radius-2xl)] transition-all duration-200 cursor-pointer
-                ${episodeLayout === 'grid'
-                  ? 'bg-[var(--accent-color)] text-white'
-                  : 'bg-[var(--glass-bg)] text-[var(--text-color-secondary)] hover:bg-[var(--glass-hover)] border border-[var(--glass-border)]'
-                }
-              `}
-              aria-label={episodeLayout === 'grid' ? '切换为列表' : '切换为网格'}
-              title={episodeLayout === 'grid' ? '切换为列表' : '切换为网格'}
-            >
-              <Icons.Layers size={16} />
-            </button>
-          )}
-          {/* Reverse order toggle button - only show when more than 1 episode */}
-          {showReverseToggle && !episodeSectionCollapsed && (
-            <button
-              onClick={() => onToggleReverse?.(!isReversed)}
-              className={`
-                p-1.5 rounded-[var(--radius-2xl)] transition-all duration-200 cursor-pointer
-                ${isReversed
-                  ? 'bg-[var(--accent-color)] text-white'
-                  : 'bg-[var(--glass-bg)] text-[var(--text-color-secondary)] hover:bg-[var(--glass-hover)] border border-[var(--glass-border)]'
-                }
-              `}
-              aria-label={isReversed ? '恢复正序' : '倒序排列'}
-              title={isReversed ? '恢复正序' : '倒序排列'}
-            >
-              <Icons.ArrowUpDown size={16} />
-            </button>
-          )}
-          <button
-            onClick={() => onEpisodeSectionCollapseChange?.(!episodeSectionCollapsed)}
-            className="p-1.5 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] text-[var(--text-color-secondary)] hover:bg-[var(--glass-hover)] border border-[var(--glass-border)] transition-all duration-200 cursor-pointer"
-            aria-label={episodeSectionCollapsed ? '展开选集列表' : '折叠选集列表'}
-            title={episodeSectionCollapsed ? '展开选集列表' : '折叠选集列表'}
-          >
-            <Icons.ChevronDown
-              size={16}
-              className={`transition-transform duration-200 ${episodeSectionCollapsed ? '-rotate-90' : 'rotate-0'}`}
-            />
-          </button>
-        </div>
-      </div>
+      {/* 桌面端：选集标题保留在卡片内 */}
+      <div className="hidden lg:block">{episodeHeader}</div>
 
       {episodeSectionCollapsed ? (
-        <div className="rounded-[var(--radius-2xl)] border border-[var(--glass-border)] bg-[var(--glass-bg)] p-3">
+        <div className="rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] p-3 lg:border lg:border-[var(--glass-border)]">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="text-[var(--text-color-secondary)]">当前选集</span>
             <span className="font-medium text-[var(--text-color)] truncate">
@@ -664,9 +698,9 @@ export function EpisodeList({
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Section page chips for long episode lists */}
+          {/* 分页切换（仅桌面端网格布局） */}
           {episodeLayout === 'grid' && totalEpisodePages > 1 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="hidden lg:flex flex-wrap gap-1.5">
               {pageRangeLabels.map((label, page) => (
                 <button
                   key={label}
@@ -688,10 +722,10 @@ export function EpisodeList({
 
           <div
             ref={listRef}
-            className={`max-h-[400px] sm:max-h-[600px] overflow-y-auto pr-1 ${
+            className={`flex gap-2 overflow-x-auto scrollbar-hide pb-1 pr-1 lg:pb-0 lg:overflow-x-hidden lg:overflow-y-auto lg:max-h-[600px] ${
               episodeLayout === 'grid'
-                ? 'grid grid-cols-3 sm:grid-cols-4 gap-2'
-                : 'space-y-2'
+                ? 'lg:grid lg:grid-cols-4 lg:gap-2'
+                : 'lg:block lg:space-y-2'
             }`}
             role="radiogroup"
             aria-label="剧集选择"
@@ -701,6 +735,8 @@ export function EpisodeList({
                 const originalIndex = getOriginalIndex(displayIndex);
                 const isCurrentEpisode = currentEpisode === originalIndex;
                 const isGrid = episodeLayout === 'grid';
+                // 桌面端网格布局下仅显示当前分页，移动端横向滑动始终完整显示
+                const isOnActivePage = !isGrid || Math.floor(displayIndex / EPISODES_PER_PAGE) === episodePage;
 
                 return (
                   <button
@@ -719,20 +755,23 @@ export function EpisodeList({
                     aria-current={isCurrentEpisode ? 'true' : undefined}
                     aria-label={`${episode.name || `第 ${originalIndex + 1} 集`}${isCurrentEpisode ? '，当前播放' : ''}`}
                     className={`
-                      rounded-[var(--radius-2xl)] transition-[var(--transition-fluid)] cursor-pointer
+                      flex-shrink-0 whitespace-nowrap rounded-[var(--radius-full)] transition-[var(--transition-fluid)] cursor-pointer
+                      px-3 py-2 text-center
+                      lg:rounded-[var(--radius-2xl)] lg:whitespace-normal lg:flex-shrink
                       ${isGrid
-                        ? 'px-2 py-2.5 text-center'
-                        : 'w-full px-3 py-2 sm:px-4 sm:py-3 text-left'
+                        ? 'lg:px-2 lg:py-2.5 lg:text-center'
+                        : 'lg:w-full lg:px-4 lg:py-3 lg:text-left'
                       }
                       ${isCurrentEpisode
-                        ? 'bg-[var(--accent-color)] text-white shadow-[0_4px_12px_color-mix(in_srgb,var(--accent-color)_50%,transparent)] brightness-110'
+                        ? 'bg-[var(--accent-color)] text-white brightness-110'
                         : 'bg-[var(--glass-bg)] hover:bg-[var(--glass-hover)] text-[var(--text-color)] border border-[var(--glass-border)]'
                       }
+                      ${isOnActivePage ? '' : 'lg:hidden'}
                       focus-visible:ring-2 focus-visible:ring-[var(--accent-color)] focus-visible:ring-offset-2
                     `}
                   >
-                    <div className={`flex items-center ${isGrid ? 'justify-center gap-1' : 'justify-between'}`}>
-                      <span className={`font-medium ${isGrid ? 'text-xs sm:text-sm truncate' : 'text-sm sm:text-base'}`}>
+                    <div className={`flex items-center justify-center gap-1 ${isGrid ? 'lg:justify-center' : 'lg:justify-between'}`}>
+                      <span className={`font-medium text-xs sm:text-sm truncate ${isGrid ? '' : 'lg:text-base'}`}>
                         {episode.name || `第 ${originalIndex + 1} 集`}
                       </span>
                       {isCurrentEpisode && !isGrid && (
@@ -743,7 +782,7 @@ export function EpisodeList({
                 );
               })
             ) : (
-              <div className="text-center py-8 text-[var(--text-secondary)] col-span-full">
+              <div className="text-center py-8 text-[var(--text-secondary)] w-full lg:col-span-full">
                 <Icons.Inbox size={48} className="text-[var(--text-color-secondary)] mx-auto mb-2" />
                 <p>暂无剧集信息</p>
               </div>
@@ -751,6 +790,7 @@ export function EpisodeList({
           </div>
         </div>
       )}
-    </Card>
+      </div>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { VideoCard } from '@/components/search/VideoCard';
 import { FavoritesEmptyState } from './FavoritesEmptyState';
 import type { FavoriteItem, Video } from '@/lib/types';
@@ -14,7 +14,6 @@ export const FavoritesGrid = memo(function FavoritesGrid({
   favorites,
   isPremium = false
 }: FavoritesGridProps) {
-  const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(24);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
@@ -62,14 +61,6 @@ export const FavoritesGrid = memo(function FavoritesGrid({
     };
   }, [visibleCount, videos.length]);
 
-  const handleCardClick = useCallback((
-    e: React.MouseEvent,
-    cardId: string,
-    videoUrl: string
-  ) => {
-    setActiveCardId(cardId);
-  }, []);
-
   if (videos.length === 0) {
     return <FavoritesEmptyState />;
   }
@@ -80,7 +71,6 @@ export const FavoritesGrid = memo(function FavoritesGrid({
         {videos.slice(0, visibleCount).map((video) => {
           const cardId = `${video.source}:${video.vod_id}`;
           const videoUrl = `/player?id=${video.vod_id}&source=${video.source}&title=${encodeURIComponent(video.vod_name)}${isPremium ? '&premium=1' : ''}`;
-          const isActive = activeCardId === cardId;
 
           return (
             <VideoCard
@@ -88,9 +78,6 @@ export const FavoritesGrid = memo(function FavoritesGrid({
               video={video}
               videoUrl={videoUrl}
               cardId={cardId}
-              isActive={isActive}
-              onCardClick={handleCardClick}
-              isPremium={isPremium}
             />
           );
         })}

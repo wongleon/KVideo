@@ -37,6 +37,20 @@ interface DesktopControlsProps {
     onProgressMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void;
     onProgressTouchStart: (e: React.TouchEvent<HTMLDivElement>) => void;
     formatTime: (seconds: number) => string;
+    // 倍速菜单（移动到了控制条右侧）
+    showSpeedMenu: boolean;
+    playbackRate: number;
+    speeds: number[];
+    onToggleSpeedMenu: () => void;
+    onSpeedChange: (speed: number) => void;
+    onSpeedMenuMouseEnter: () => void;
+    onSpeedMenuMouseLeave: () => void;
+    containerRef: React.RefObject<HTMLDivElement | null>;
+    isRotated?: boolean;
+    // 下一集
+    hasNextEpisode?: boolean;
+    showNextEpisode?: boolean;
+    onNextEpisode?: () => void;
 }
 
 export function DesktopControls(props: DesktopControlsProps) {
@@ -67,6 +81,8 @@ export function DesktopControls(props: DesktopControlsProps) {
                 currentTime={currentTime}
                 duration={duration}
                 bufferedTime={bufferedTime}
+                isFullscreen={props.isFullscreen}
+                formatTime={formatTime}
                 onProgressClick={onProgressClick}
                 onProgressMouseDown={onProgressMouseDown}
                 onProgressTouchStart={onProgressTouchStart}

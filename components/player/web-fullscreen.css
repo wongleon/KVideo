@@ -36,6 +36,20 @@
     border-radius: 0 !important;
 }
 
+/* 「铺满」档位：横向铺满窗口且高度不出屏，画面按比例裁切上下（仅宽屏窗口生效） */
+@media (min-aspect-ratio: 16/9) {
+    .kvideo-container.is-web-fullscreen.web-size-full .kvideo-web-fullscreen-stage {
+        width: var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) !important;
+        height: var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) !important;
+        max-width: none !important;
+        max-height: none !important;
+    }
+
+    .kvideo-container.is-web-fullscreen.web-size-full video {
+        object-fit: cover !important;
+    }
+}
+
 /* Force Landscape Mode for Mobile (iOS mainly) */
 .kvideo-container.is-web-fullscreen.force-landscape {
     width: var(--kvideo-viewport-height, 100vh) !important;

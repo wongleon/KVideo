@@ -5,7 +5,7 @@
 
 import Image from 'next/image';
 import { Icons } from '@/components/ui/Icon';
-import { formatTime, formatDate } from '@/lib/utils/format-utils';
+import { formatTime } from '@/lib/utils/format-utils';
 import { PosterImage } from './PosterImage';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
 import { getSourceName } from '@/lib/utils/source-names';
@@ -60,7 +60,7 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
     : '';
 
   return (
-    <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-[var(--radius-2xl)] p-3 hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
+    <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-lg overflow-hidden hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
       <a
         href={getVideoUrl()}
         onClick={(e) => {
@@ -73,28 +73,27 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
         onAuxClick={(e) => handleClick(e as any)}
         className="block"
       >
-        <div className="flex gap-3">
-          {/* Poster */}
+        <div className="flex items-stretch gap-3">
+          {/* Poster：竖版，上下贴边、与左侧边框无间距 */}
           <PosterImage poster={item.poster} title={item.title} progress={progress} />
 
           {/* Info */}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-medium text-[var(--text-color)] truncate group-hover:text-[var(--accent-color)] transition-colors mb-1">
+          <div className="flex-1 min-w-0 flex flex-col justify-start gap-1.5 pt-2 pb-3">
+            <h3 className="text-base font-medium text-[var(--text-color)] truncate group-hover:text-[var(--accent-color)] transition-colors">
               {item.title}
             </h3>
             {episodeText && (
-              <p className="text-xs text-[var(--text-color-secondary)] mb-1">
+              <p className="text-xs text-[var(--text-color-secondary)]">
                 {episodeText}
               </p>
             )}
-            <div className="flex items-center justify-between text-xs text-[var(--text-color-secondary)]">
+            <div className="flex items-center text-xs text-[var(--text-color-secondary)]">
               <span>{formatTime(item.playbackPosition)} / {formatTime(item.duration)}</span>
-              <span>{formatDate(item.timestamp)}</span>
             </div>
           </div>
 
           {/* Actions - 横向排列并上下居中 */}
-          <div className="flex items-center gap-1.5 self-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1.5 self-center pr-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             {/* Favorite button - 左侧 */}
             <FavoriteButton
               videoId={item.videoId}

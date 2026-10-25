@@ -61,6 +61,39 @@ function getFullscreenDocument(): FullscreenCapableDocument {
     return document as FullscreenCapableDocument;
 }
 
+/** 等待视频具备进入画中画所需的数据（readyState >= 2），超时后直接返回 */
+function waitForVideoReady(video: HTMLVideoElement, timeoutMs: number): Promise<void> {
+    return new Promise((resolve) => {
+        if (video.readyState >= 2) {
+            resolve();
+            return;
+        }
+
+        let timer: number | null = null;
+
+        const cleanup = () => {
+            if (timer !== null) window.clearTimeout(timer);
+            video.removeEventListener('loadeddata', onReady);
+            video.removeEventListener('canplay', onReady);
+            video.removeEventListener('playing', onReady);
+        };
+
+        const onReady = () => {
+            cleanup();
+            resolve();
+        };
+
+        timer = window.setTimeout(() => {
+            cleanup();
+            resolve();
+        }, timeoutMs);
+
+        video.addEventListener('loadeddata', onReady, { once: true });
+        video.addEventListener('canplay', onReady, { once: true });
+        video.addEventListener('playing', onReady, { once: true });
+    });
+}
+
 function waitForAnimationFrame(): Promise<void> {
     return new Promise((resolve) => {
         window.requestAnimationFrame(() => resolve());
@@ -429,12 +462,31 @@ export function useFullscreenControls({
         if (!videoRef.current || !isPiPSupported) return;
         const video = videoRef.current as PiPCapableVideoElement;
         const fullscreenDocument = getFullscreenDocument();
-        try {
-            if (fullscreenDocument.pictureInPictureElement && fullscreenDocument.exitPictureInPicture) {
+
+        // 已处于画中画：退出
+        if (fullscreenDocument.pictureInPictureElement && fullscreenDocument.exitPictureInPicture) {
+            try {
                 await fullscreenDocument.exitPictureInPicture();
-            } else if (video.webkitPresentationMode === 'picture-in-picture') {
-                video.webkitSetPresentationMode?.('inline');
-            } else if (video.requestPictureInPicture && fullscreenDocument.pictureInPictureEnabled) {
+            } catch (error) {
+                console.error('Failed to exit Picture-in-Picture:', error);
+            }
+            return;
+        }
+        if (video.webkitPresentationMode === 'picture-in-picture') {
+            video.webkitSetPresentationMode?.('inline');
+            return;
+        }
+
+        // iOS 要求视频已开始播放且已有可用数据，否则会抛 InvalidStateError
+        if (video.paused) {
+            video.play().catch(() => { /* 忽略自动播放限制 */ });
+        }
+        if (video.readyState < 2) {
+            await waitForVideoReady(video, 3000);
+        }
+
+        try {
+            if (video.requestPictureInPicture && fullscreenDocument.pictureInPictureEnabled) {
                 await video.requestPictureInPicture();
             } else if (await requestAndroidPictureInPicture()) {
                 return;
@@ -445,6 +497,18 @@ export function useFullscreenControls({
                 video.webkitSetPresentationMode('picture-in-picture');
             }
         } catch (error) {
+            // iOS 回退：部分 Safari 版本仅支持 webkit 专有 API，标准 API 会直接抛错
+            if (
+                video.webkitSupportsPresentationMode?.('picture-in-picture') &&
+                video.webkitSetPresentationMode
+            ) {
+                try {
+                    video.webkitSetPresentationMode('picture-in-picture');
+                    return;
+                } catch {
+                    // 继续尝试其他方案
+                }
+            }
             if (await requestAndroidPictureInPicture()) {
                 return;
             }

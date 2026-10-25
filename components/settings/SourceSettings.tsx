@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SourceManager } from '@/components/settings/SourceManager';
+import { SettingsSection } from './SettingsSection';
 import type { VideoSource } from '@/lib/types';
 import { DEFAULT_SOURCES } from '@/lib/api/default-sources';
 
@@ -58,10 +59,11 @@ export function SourceSettings({
     };
 
     return (
-        <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-[var(--text-color)]">视频源管理</h2>
-                <div className="flex gap-2 flex-wrap">
+        <SettingsSection
+            title="视频源管理"
+            description="管理视频来源，调整优先级和启用状态"
+            headerAction={
+                <>
                     <button
                         onClick={onRestoreDefaults}
                         className="px-4 py-2 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] text-sm font-medium hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
@@ -74,12 +76,9 @@ export function SourceSettings({
                     >
                         + 添加源
                     </button>
-                </div>
-            </div>
-            <p className="text-sm text-[var(--text-color-secondary)] mb-6">
-                管理视频来源，调整优先级和启用状态
-            </p>
-
+                </>
+            }
+        >
             {/* Search Bar */}
             <div className="relative mb-4">
                 <input
@@ -115,6 +114,6 @@ export function SourceSettings({
                     {showAllSources ? '收起' : `显示全部 (${sources.length})`}
                 </button>
             )}
-        </div>
+        </SettingsSection>
     );
 }

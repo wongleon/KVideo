@@ -47,23 +47,8 @@ const HOME_FILTERS: HomeFilter[] = [
 
 const PAGE_LIMIT = 20;
 
-/** 基于种子的伪随机数生成器（mulberry32），保证同一种子结果稳定 */
-function createSeededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** 取当天日期的数字种子，同一天内轮播内容保持不变 */
-function getDailySeed(): number {
-  const now = new Date();
-  return now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
-}
+/** 轮播图取图来源：热门电影、热门剧集、热门综艺、热门美剧各取一张 */
+const CAROUSEL_FILTERS = HOME_FILTERS.filter((filter) => filter.id !== 'recommend');
 
 /** 拉取一页豆瓣数据，多路查询交错合并并去重 */
 async function fetchDoubanPage(queries: DoubanQuery[], pageNumber: number): Promise<DoubanMovie[]> {
@@ -103,11 +88,9 @@ async function fetchDoubanPage(queries: DoubanQuery[], pageNumber: number): Prom
 interface DoubanFeedProps {
   queries: DoubanQuery[];
   onMovieClick: (movie: DoubanMovie) => void;
-  /** 首屏数据加载完成后回调完整列表，由上层随机挑选轮播内容 */
-  onFirstPageLoaded?: (movies: DoubanMovie[]) => void;
 }
 
-function DoubanFeed({ queries, onMovieClick, onFirstPageLoaded }: DoubanFeedProps) {
+function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
   const [movies, setMovies] = useState<DoubanMovie[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -121,13 +104,12 @@ function DoubanFeed({ queries, onMovieClick, onFirstPageLoaded }: DoubanFeedProp
       setMovies(list);
       setHasMore(list.length > 0);
       setLoading(false);
-      onFirstPageLoaded?.(list);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [queries, onFirstPageLoaded]);
+  }, [queries]);
 
   const loadMore = useCallback(async (nextPage: number) => {
     setLoading(true);
@@ -167,7 +149,7 @@ interface PopularFeaturesProps {
 
 export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
   const [selectedFilterId, setSelectedFilterId] = useState(HOME_FILTERS[0].id);
-  // 推荐标签前 5 个影片，用于顶部轮播图
+  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张
   const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>([]);
 
   // 标签栏横向滑动（滚轮 + 鼠标拖动）
@@ -274,16 +256,29 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
     }
   }, [onSearch]);
 
-  // 仅「推荐」标签使用首屏数据，按日期种子随机挑 5 条作为轮播内容
-  const handleFirstPageLoaded = useCallback((list: DoubanMovie[]) => {
-    const random = createSeededRandom(getDailySeed());
-    const shuffled = [...list];
-    // 洗牌：同一天内结果固定，跨天自动换一批
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const target = Math.floor(random() * (index + 1));
-      [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
-    }
-    setCarouselMovies(shuffled.slice(0, 5));
+  // 首屏并行拉取四个分类，各取列表第一张组成轮播图
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all(CAROUSEL_FILTERS.map((filter) => fetchDoubanPage(filter.queries, 0))).then((lists) => {
+      if (cancelled) return;
+
+      const picks: DoubanMovie[] = [];
+      const seen = new Set<string>();
+
+      lists.forEach((list) => {
+        const movie = list[0];
+        if (!movie || seen.has(movie.id)) return;
+        seen.add(movie.id);
+        picks.push(movie);
+      });
+
+      setCarouselMovies(picks);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -335,7 +330,6 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
         key={activeFilter.id}
         queries={activeFilter.queries}
         onMovieClick={handleMovieClick}
-        onFirstPageLoaded={activeFilter.id === 'recommend' ? handleFirstPageLoaded : undefined}
       />
     </div>
   );

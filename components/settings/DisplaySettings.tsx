@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { type SearchDisplayMode, type LocaleOption } from '@/lib/store/settings-store';
 import { Switch } from '@/components/ui/Switch';
+import { SettingsSection } from './SettingsSection';
 
 interface DisplaySettingsProps {
     realtimeLatency: boolean;
@@ -51,9 +52,7 @@ export function DisplaySettings({
         onBlockedCategoriesChange(blockedCategories.filter(c => c !== cat));
     };
     return (
-        <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
-            <h2 className="text-xl font-semibold text-[var(--text-color)] mb-4">显示设置</h2>
-
+        <SettingsSection title="显示设置">
             {/* Remember Scroll Position Toggle */}
             <div className="mb-6">
                 <div className="flex items-center justify-between">
@@ -191,6 +190,6 @@ export function DisplaySettings({
                     </div>
                 )}
             </div>
-        </div>
+        </SettingsSection>
     );
 }

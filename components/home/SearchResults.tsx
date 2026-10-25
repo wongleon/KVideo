@@ -1,4 +1,3 @@
-import { ResultsHeader } from '@/components/search/ResultsHeader';
 import { SourceBadges } from '@/components/search/SourceBadges';
 import { VideoGrid } from '@/components/search/VideoGrid';
 import { useSourceBadges } from '@/lib/hooks/useSourceBadges';
@@ -31,12 +30,6 @@ export function SearchResults({
 
     return (
         <div className="animate-fade-in">
-            <ResultsHeader
-                loading={loading}
-                resultsCount={results.length}
-                availableSources={availableSources}
-            />
-
             {/* 视频源筛选标签 */}
             {availableSources.length > 0 && (
                 <SourceBadges

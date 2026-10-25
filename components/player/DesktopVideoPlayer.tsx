@@ -61,6 +61,8 @@ interface DesktopVideoPlayerProps {
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   initialTime?: number;
   shouldAutoPlay?: boolean;
+  /** 返回上一页，用于播放器左上角的返回按钮 */
+  onBack?: () => void;
   // Episode navigation props for auto-skip/auto-next
   totalEpisodes?: number;
   currentEpisodeIndex?: number;
@@ -81,6 +83,7 @@ export function DesktopVideoPlayer({
   onTimeUpdate,
   initialTime = 0,
   shouldAutoPlay = false,
+  onBack,
   totalEpisodes = 1,
   currentEpisodeIndex = 0,
   onNextEpisode,
@@ -328,6 +331,11 @@ export function DesktopVideoPlayer({
   const stageClassName = data.fullscreenMode === 'window'
     ? 'kvideo-stage kvideo-web-fullscreen-stage'
     : 'kvideo-stage absolute inset-0';
+
+  // 存在下一集时在控制条显示「下一集」按钮（全屏，或移动端始终显示）
+  const hasNextEpisode = Boolean(onNextEpisode) && totalEpisodes > 1;
+  const showNextEpisode = hasNextEpisode && (data.isFullscreen || isMobile);
+
   const isTopAlignedWebFullscreen = data.fullscreenMode === 'window' && isMobile && !isLandscape && !shouldForceLandscape;
 
   // Mobile double-tap gesture for skip forward/backward
@@ -355,7 +363,7 @@ export function DesktopVideoPlayer({
   return (
     <div
       ref={containerRef}
-      className={`kvideo-container relative aspect-video bg-black group ${data.fullscreenMode === 'window' ? 'is-web-fullscreen' : ''
+      className={`kvideo-container relative aspect-video bg-black group ${data.fullscreenMode === 'window' ? `is-web-fullscreen web-size-${webFullscreenSize}` : ''
         } ${shouldForceLandscape ? 'force-landscape' : ''} ${isTopAlignedWebFullscreen ? 'top-align-stage' : ''} overflow-hidden rounded-none sm:rounded-[var(--radius-2xl)]`}
       style={containerStyle}
       onMouseMove={() => { handleMouseMove(); }}
@@ -415,6 +423,7 @@ export function DesktopVideoPlayer({
             isFullscreen={data.isFullscreen}
             fullscreenClock={fullscreenClock}
             isRotated={shouldForceLandscape}
+            onBack={onBack}
             onTogglePlay={togglePlay}
             onSkipForward={logic.skipForward}
             onSkipBackward={logic.skipBackward}
@@ -441,14 +450,15 @@ export function DesktopVideoPlayer({
             }}
             onCopyLink={logic.handleCopyLink}
             seekStepSeconds={seekStepSeconds}
-            // Speed Menu Props
-            playbackRate={data.playbackRate}
-            showSpeedMenu={data.showSpeedMenu}
-            speeds={[0.5, 0.75, 1, 1.25, 1.5, 2]}
-            onToggleSpeedMenu={() => actions.setShowSpeedMenu(!data.showSpeedMenu)}
-            onSpeedChange={logic.changePlaybackSpeed}
-            onSpeedMenuMouseEnter={logic.clearSpeedMenuTimeout}
-            onSpeedMenuMouseLeave={logic.startSpeedMenuTimeout}
+            // 右上角快捷入口：画中画 + 全屏时的投屏
+            isPiPSupported={data.isPiPSupported}
+            onTogglePictureInPicture={logic.togglePictureInPicture}
+            isCastAvailable={data.isCastAvailable}
+            onShowCastMenu={logic.showCastMenu}
+            isAirPlaySupported={data.isAirPlaySupported}
+            onShowAirPlayMenu={logic.showAirPlayMenu}
+            isWebFullscreen={data.fullscreenMode === 'window'}
+            onToggleWebFullscreen={logic.toggleWindowFullscreen}
             webFullscreenSize={webFullscreenSize}
             onCycleWebFullscreenSize={cycleWebFullscreenSize}
             // Portal container
@@ -460,6 +470,11 @@ export function DesktopVideoPlayer({
               data={data}
               logic={logic}
               refs={refs}
+              onToggleSpeedMenu={() => actions.setShowSpeedMenu(!data.showSpeedMenu)}
+              isRotated={shouldForceLandscape}
+              hasNextEpisode={hasNextEpisode}
+              showNextEpisode={showNextEpisode}
+              onNextEpisode={onNextEpisode}
             />
           </div>
         </div>

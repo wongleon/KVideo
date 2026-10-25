@@ -12,6 +12,7 @@ interface VideoData {
   vod_director?: string;
   vod_year?: string;
   vod_area?: string;
+  vod_lang?: string;
   type_name?: string;
   episodes?: Array<{ name?: string; url: string }>;
 }

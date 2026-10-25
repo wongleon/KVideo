@@ -10,6 +10,8 @@ interface CustomVideoPlayerProps {
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   initialTime?: number;
   shouldAutoPlay?: boolean;
+  /** 返回上一页，用于播放器左上角的返回按钮 */
+  onBack?: () => void;
   // Episode navigation props for auto-skip/auto-next
   totalEpisodes?: number;
   currentEpisodeIndex?: number;

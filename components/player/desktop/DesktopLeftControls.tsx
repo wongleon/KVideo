@@ -4,6 +4,10 @@ import { DesktopVolumeControl } from './DesktopVolumeControl';
 
 interface DesktopLeftControlsProps {
     isPlaying: boolean;
+    isFullscreen: boolean;
+    hasNextEpisode?: boolean;
+    showNextEpisode?: boolean;
+    onNextEpisode?: () => void;
     currentTime: number;
     duration: number;
     volume: number;
@@ -19,6 +23,10 @@ interface DesktopLeftControlsProps {
 
 export function DesktopLeftControls({
     isPlaying,
+    isFullscreen,
+    hasNextEpisode = false,
+    showNextEpisode = false,
+    onNextEpisode,
     currentTime,
     duration,
     volume,
@@ -42,6 +50,18 @@ export function DesktopLeftControls({
                 {isPlaying ? <Icons.Pause size={20} /> : <Icons.Play size={20} />}
             </button>
 
+            {/* 全屏时在播放键右侧显示「下一集」，图标为原快退图标的镜像 */}
+            {showNextEpisode && hasNextEpisode && onNextEpisode && (
+                <button
+                    onClick={onNextEpisode}
+                    className="btn-icon shrink-0"
+                    aria-label="下一集"
+                    title="下一集"
+                >
+                    <Icons.SkipForward size={20} />
+                </button>
+            )}
+
             {/* Volume */}
             <div className="player-volume-control shrink-0">
                 <DesktopVolumeControl
@@ -55,8 +75,8 @@ export function DesktopLeftControls({
                 />
             </div>
 
-            {/* Time */}
-            <span className="player-time-display min-w-0 truncate text-sm font-medium text-white tabular-nums">
+            {/* Time - 全屏时时间移到进度条上方，移动端非全屏时时间在进度条两侧 */}
+            <span className={`player-time-display min-w-0 truncate text-sm font-medium text-white tabular-nums ${isFullscreen ? 'hidden' : 'hidden lg:inline'}`}>
                 <span>{formatTime(currentTime)}</span>
                 <span className="player-duration-display"> / {formatTime(duration)}</span>
             </span>

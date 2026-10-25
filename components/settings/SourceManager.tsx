@@ -41,39 +41,37 @@ export function SourceManager({
           key={source.id}
           className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-[var(--radius-2xl)] p-4 transition-all duration-300"
         >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              {/* Toggle Switch */}
-              <button
-                onClick={() => handleToggle(source.id)}
-                className="relative inline-block w-12 h-7 flex-shrink-0 cursor-pointer"
-                aria-label={`切换 ${source.name} 状态`}
-              >
-                <span
-                  className={`absolute inset-0 rounded-[var(--radius-full)] transition-all duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${source.enabled
-                    ? 'bg-[var(--accent-color)]'
-                    : 'bg-[color-mix(in_srgb,var(--text-color)_20%,transparent)]'
-                    }`}
-                />
-                <span
-                  className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-[var(--radius-full)] shadow-sm transition-transform duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${source.enabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                />
-              </button>
-
-              {/* Source Info */}
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[var(--text-color)] truncate">
-                  {source.name}
-                </div>
-                <div className="text-sm text-[var(--text-color-secondary)] truncate">
-                  {source.baseUrl}
-                </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
+            {/* Source Info */}
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-[var(--text-color)] truncate">
+                {source.name}
+              </div>
+              <div className="text-sm text-[var(--text-color-secondary)] truncate">
+                {source.baseUrl}
               </div>
             </div>
 
+            {/* Toggle Switch */}
+            <button
+              onClick={() => handleToggle(source.id)}
+              className="relative inline-block w-12 h-7 flex-shrink-0 cursor-pointer"
+              aria-label={`切换 ${source.name} 状态`}
+            >
+              <span
+                className={`absolute inset-0 rounded-[var(--radius-full)] transition-all duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${source.enabled
+                  ? 'bg-[var(--accent-color)]'
+                  : 'bg-[color-mix(in_srgb,var(--text-color)_20%,transparent)]'
+                  }`}
+              />
+              <span
+                className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-[var(--radius-full)] shadow-sm transition-transform duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${source.enabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+              />
+            </button>
+
             {/* Controls */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:flex-shrink-0">
               {/* Priority Controls */}
               <button
                 onClick={() => handlePriorityChange(source.id, 'up')}

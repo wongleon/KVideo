@@ -77,7 +77,7 @@ export function BottomNav() {
             className="fixed inset-x-0 bottom-0 z-[1500] flex justify-center px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none"
         >
             <div
-                className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-[28px] border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_55%,transparent)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_var(--shadow-color)]"
+                className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-[28px] border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_20%,transparent)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_var(--shadow-color)]"
                 style={{ transform: 'translate3d(0, 0, 0)' }}
             >
                 {NAV_ITEMS.map(({ href, label, Icon }) => {

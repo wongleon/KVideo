@@ -10,8 +10,6 @@ import { DataSettings } from '@/components/settings/DataSettings';
 import { AccountSettings } from '@/components/settings/AccountSettings';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
-import { SettingsHeader } from '@/components/settings/SettingsHeader';
-import { AppVersionSettings } from '@/components/settings/AppVersionSettings';
 import { UserSourceSettings } from '@/components/settings/UserSourceSettings';
 import { UserDanmakuSettings } from '@/components/settings/UserDanmakuSettings';
 import { PermissionGate } from '@/components/PermissionGate';
@@ -78,11 +76,6 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
       <div className="container mx-auto px-4 pt-8 pb-32 max-w-4xl space-y-8">
-        {/* Header */}
-        <SettingsHeader />
-
-        <AppVersionSettings />
-
         {/* Account Settings */}
         <AccountSettings />
 

@@ -175,7 +175,7 @@ export function AppVersionSettings() {
           type="button"
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="inline-flex items-center gap-2 rounded-[var(--radius-full)] border border-[var(--glass-border)] px-4 py-2 text-sm font-medium text-[var(--text-color)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--accent-color)_8%,transparent)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="ml-auto inline-flex items-center gap-2 rounded-[var(--radius-full)] border border-[var(--glass-border)] px-4 py-2 text-sm font-medium text-[var(--text-color)] transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--accent-color)_8%,transparent)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
           检查更新

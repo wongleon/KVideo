@@ -53,7 +53,7 @@ export function VideoMetadata({ videoData, source, title }: VideoMetadataProps) 
           )}
         </div>
         <div className="flex-1">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[var(--text-color)] mb-3">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-[var(--text-color)] mb-3 pr-12">
             {videoData?.vod_name || title}
           </h1>
           <div className="flex flex-wrap gap-2 mb-4">

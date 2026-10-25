@@ -18,7 +18,7 @@ function HomePage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       {/* Glass Navbar */}
       <Navbar onReset={handleReset} />
 

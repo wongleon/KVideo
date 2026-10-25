@@ -8,6 +8,7 @@
 import { Icons } from '@/components/ui/Icon';
 import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
 import { Switch } from '@/components/ui/Switch';
+import { SettingsSection } from './SettingsSection';
 import {
     type ProxyMode,
     DEFAULT_SEEK_STEP_SECONDS,
@@ -67,9 +68,7 @@ export function PlayerSettings({
     const effectiveProxyMode = mediaProxyEnabled ? proxyMode : 'none';
 
     return (
-        <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
-            <h2 className="text-xl font-semibold text-[var(--text-color)] mb-4">播放器设置</h2>
-
+        <SettingsSection title="播放器设置">
             <div className="space-y-6">
                 {/* Fullscreen Mode Selection */}
                 <div>
@@ -342,6 +341,6 @@ export function PlayerSettings({
                     </div>
                 </div>
             </div>
-        </div>
+        </SettingsSection>
     );
 }

@@ -8,9 +8,17 @@ interface DesktopControlsWrapperProps {
     data: ReturnType<typeof useDesktopPlayerState>['data'];
     logic: ReturnType<typeof useDesktopPlayerLogic>;
     refs: ReturnType<typeof useDesktopPlayerState>['refs'];
+    /** 切换倍速菜单（菜单已移入控制条） */
+    onToggleSpeedMenu: () => void;
+    isRotated?: boolean;
+    /** 是否存在下一集，用于全屏时的「下一集」按钮 */
+    hasNextEpisode?: boolean;
+    /** 是否显示「下一集」按钮（全屏，或移动端始终显示） */
+    showNextEpisode?: boolean;
+    onNextEpisode?: () => void;
 }
 
-export function DesktopControlsWrapper({ src, data, logic, refs }: DesktopControlsWrapperProps) {
+export function DesktopControlsWrapper({ src, data, logic, refs, onToggleSpeedMenu, isRotated = false, hasNextEpisode = false, showNextEpisode = false, onNextEpisode }: DesktopControlsWrapperProps) {
     const {
         isPlaying,
         currentTime,
@@ -84,6 +92,18 @@ export function DesktopControlsWrapper({ src, data, logic, refs }: DesktopContro
             onProgressMouseDown={handleProgressMouseDown}
             onProgressTouchStart={handleProgressTouchStart}
             formatTime={formatTime}
+            showSpeedMenu={data.showSpeedMenu}
+            playbackRate={data.playbackRate}
+            speeds={[0.5, 0.75, 1, 1.25, 1.5, 2]}
+            onToggleSpeedMenu={onToggleSpeedMenu}
+            onSpeedChange={logic.changePlaybackSpeed}
+            onSpeedMenuMouseEnter={logic.clearSpeedMenuTimeout}
+            onSpeedMenuMouseLeave={logic.startSpeedMenuTimeout}
+            containerRef={refs.containerRef}
+            isRotated={isRotated}
+            hasNextEpisode={hasNextEpisode}
+            showNextEpisode={showNextEpisode}
+            onNextEpisode={onNextEpisode}
         />
     );
 }

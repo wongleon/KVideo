@@ -208,6 +208,7 @@ export function VideoPlayer({
           onTimeUpdate={handleTimeUpdate}
           initialTime={getSavedProgress()}
           shouldAutoPlay={shouldAutoPlay}
+          onBack={onBack}
           totalEpisodes={totalEpisodes}
           currentEpisodeIndex={currentEpisode}
           onNextEpisode={onNextEpisode}

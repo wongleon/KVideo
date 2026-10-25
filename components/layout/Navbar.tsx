@@ -38,7 +38,7 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
             willChange: 'transform'
         }}>
             <div className="max-w-7xl mx-auto px-4">
-                <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] shadow-[var(--shadow-sm)] px-3 sm:px-6 py-2 sm:py-4 rounded-[var(--radius-2xl)]" style={{
+                <div className="py-2 sm:py-4" style={{
                     transform: 'translate3d(0, 0, 0)'
                 }}>
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
@@ -59,11 +59,22 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
                                 />
                             </div>
                             <div className="flex flex-col min-w-0">
-                                <h1 className="text-lg sm:text-2xl font-bold text-[var(--text-color)] truncate">{siteConfig.name}</h1>
+                                <h1 className="font-brand text-lg sm:text-2xl font-bold text-[var(--text-color)] truncate">{siteConfig.name}</h1>
                             </div>
                         </Link>
 
                         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                            {/* Search Entry */}
+                            <Link
+                                href="/search"
+                                className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
+                                aria-label="搜索"
+                                title="搜索"
+                                data-focusable
+                            >
+                                <Icons.Search size={20} />
+                            </Link>
+
                             {/* IPTV Link - only show if user has iptv_access or no auth configured */}
                             {iptvEnabled && hasPermission('iptv_access') && (
                             <Link
@@ -76,17 +87,6 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
                                 <Icons.TV size={16} className="sm:w-5 sm:h-5" />
                             </Link>
                             )}
-
-                            {/* Search Entry */}
-                            <Link
-                                href="/search"
-                                className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
-                                aria-label="搜索"
-                                title="搜索"
-                                data-focusable
-                            >
-                                <Icons.Search size={20} />
-                            </Link>
 
                             {/* User Info */}
                             {session && (

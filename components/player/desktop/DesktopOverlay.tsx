@@ -2,7 +2,6 @@ import React from 'react';
 import { Icons } from '@/components/ui/Icon';
 
 import { DesktopMoreMenu } from './DesktopMoreMenu';
-import { DesktopSpeedMenu } from './DesktopSpeedMenu';
 
 interface DesktopOverlayProps {
     isLoading: boolean;
@@ -30,18 +29,20 @@ interface DesktopOverlayProps {
     onMoreMenuMouseLeave: () => void;
     onCopyLink: (type?: 'original' | 'proxy') => void;
     seekStepSeconds: number;
-    // Speed Menu Props
-    playbackRate: number;
-    showSpeedMenu: boolean;
-    speeds: number[];
-    onToggleSpeedMenu: () => void;
-    onSpeedChange: (speed: number) => void;
-    onSpeedMenuMouseEnter: () => void;
-    onSpeedMenuMouseLeave: () => void;
+    // 右上角快捷入口
+    isPiPSupported: boolean;
+    onTogglePictureInPicture: () => void;
+    isCastAvailable: boolean;
+    onShowCastMenu: () => void;
+    isAirPlaySupported: boolean;
+    onShowAirPlayMenu: () => void;
+    isWebFullscreen: boolean;
+    onToggleWebFullscreen: () => void;
     webFullscreenSize: 'full' | 'large' | 'focused';
     onCycleWebFullscreenSize: () => void;
     containerRef: React.RefObject<HTMLDivElement | null>;
     isRotated?: boolean;
+    onBack?: () => void;
 }
 
 export function DesktopOverlay({
@@ -70,17 +71,19 @@ export function DesktopOverlay({
     onMoreMenuMouseLeave,
     onCopyLink,
     seekStepSeconds,
-    playbackRate,
-    showSpeedMenu,
-    speeds,
-    onToggleSpeedMenu,
-    onSpeedChange,
-    onSpeedMenuMouseEnter,
-    onSpeedMenuMouseLeave,
+    isPiPSupported,
+    onTogglePictureInPicture,
+    isCastAvailable,
+    onShowCastMenu,
+    isAirPlaySupported,
+    onShowAirPlayMenu,
+    isWebFullscreen,
+    onToggleWebFullscreen,
     webFullscreenSize,
     onCycleWebFullscreenSize,
     containerRef,
     isRotated = false,
+    onBack,
 }: DesktopOverlayProps) {
     // Show navigation buttons when controls are visible or when paused (controls usually show when paused anyway)
     const showNavButtons = showControls || !isPlaying;
@@ -88,22 +91,22 @@ export function DesktopOverlay({
 
     return (
         <>
-            {/* More Menu (Top Left) - Moved slightly down and lower z-index to stay below navbar */}
-            <div className={`absolute top-8 left-6 z-40 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`} style={{ pointerEvents: showControls ? 'auto' : 'none' }}>
-                <DesktopMoreMenu
-                    showMoreMenu={showMoreMenu}
-                    isPremium={isPremium}
-                    isProxied={isProxied}
-                    onToggleMoreMenu={onToggleMoreMenu}
-                    onMouseEnter={onMoreMenuMouseEnter}
-                    onMouseLeave={onMoreMenuMouseLeave}
-                    onCopyLink={onCopyLink}
-                    webFullscreenSize={webFullscreenSize}
-                    onCycleWebFullscreenSize={onCycleWebFullscreenSize}
-                    containerRef={containerRef}
-                    isRotated={isRotated}
-                />
-            </div>
+            {/* 返回按钮：网页全屏时退出全屏回到播放页，否则返回上一页 */}
+            {(onBack || isWebFullscreen) && (
+                <div
+                    className={`player-edge-padding absolute left-0 z-40 transition-opacity duration-300 ${isFullscreen ? 'top-8' : 'top-4'} ${isWebFullscreen ? '' : 'lg:hidden'} ${showControls ? 'opacity-100' : 'opacity-0'}`}
+                    style={{ pointerEvents: showControls ? 'auto' : 'none' }}
+                >
+                    <button
+                        onClick={isWebFullscreen ? onToggleWebFullscreen : onBack}
+                        aria-label={isWebFullscreen ? '退出网页全屏' : '返回'}
+                        title={isWebFullscreen ? '退出网页全屏' : '返回'}
+                        className="group flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white transition-all duration-300 hover:scale-110 active:scale-95"
+                    >
+                        <Icons.ChevronLeft className="text-white/80 group-hover:text-white w-5 h-5 sm:w-6 sm:h-6" />
+                    </button>
+                </div>
+            )}
 
             {isFullscreen && fullscreenClock && (
                 <div
@@ -121,16 +124,51 @@ export function DesktopOverlay({
                 </div>
             )}
 
-            {/* Speed Menu (Top Right) - Moved slightly down and lower z-index */}
-            <div className={`absolute top-8 right-6 z-40 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`} style={{ pointerEvents: showControls ? 'auto' : 'none' }}>
-                <DesktopSpeedMenu
-                    showSpeedMenu={showSpeedMenu}
-                    playbackRate={playbackRate}
-                    speeds={speeds}
-                    onSpeedChange={onSpeedChange}
-                    onToggleSpeedMenu={onToggleSpeedMenu}
-                    onMouseEnter={onSpeedMenuMouseEnter}
-                    onMouseLeave={onSpeedMenuMouseLeave}
+            {/* Top Right Controls: 画中画 / 投屏（仅全屏） / 更多 */}
+            <div className={`player-edge-padding absolute right-0 ${isFullscreen ? 'top-8' : 'top-4'} z-40 flex items-center gap-2 transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`} style={{ pointerEvents: showControls ? 'auto' : 'none' }}>
+                {isPiPSupported && (
+                    <button
+                        onClick={onTogglePictureInPicture}
+                        aria-label="画中画"
+                        title="画中画"
+                        className="group flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white transition-all duration-300 hover:scale-110 active:scale-95"
+                    >
+                        <Icons.PictureInPicture className="text-white/80 group-hover:text-white w-5 h-5 sm:w-6 sm:h-6" />
+                    </button>
+                )}
+
+                {isCastAvailable && isFullscreen && (
+                    <button
+                        onClick={onShowCastMenu}
+                        aria-label="投屏"
+                        title="投屏"
+                        className="group flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white transition-all duration-300 hover:scale-110 active:scale-95"
+                    >
+                        <Icons.Cast className="text-white/80 group-hover:text-white w-5 h-5 sm:w-6 sm:h-6" />
+                    </button>
+                )}
+
+                {isAirPlaySupported && (
+                    <button
+                        onClick={onShowAirPlayMenu}
+                        aria-label="隔空播放"
+                        title="隔空播放"
+                        className="group flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white transition-all duration-300 hover:scale-110 active:scale-95"
+                    >
+                        <Icons.Airplay className="text-white/80 group-hover:text-white w-5 h-5 sm:w-6 sm:h-6" />
+                    </button>
+                )}
+
+                <DesktopMoreMenu
+                    showMoreMenu={showMoreMenu}
+                    isPremium={isPremium}
+                    isProxied={isProxied}
+                    onToggleMoreMenu={onToggleMoreMenu}
+                    onMouseEnter={onMoreMenuMouseEnter}
+                    onMouseLeave={onMoreMenuMouseLeave}
+                    onCopyLink={onCopyLink}
+                    webFullscreenSize={webFullscreenSize}
+                    onCycleWebFullscreenSize={onCycleWebFullscreenSize}
                     containerRef={containerRef}
                     isRotated={isRotated}
                 />
@@ -170,9 +208,9 @@ export function DesktopOverlay({
                 </div>
             )}
 
-            {/* Previous Button (Method: Skip Backward) */}
+            {/* Previous Button - 垂直居中，左边缘与控制条播放键对齐 */}
             <div
-                className={`absolute left-0 top-0 bottom-0 flex items-center justify-center p-4 md:p-8 transition-opacity duration-300 z-10 ${showNavButtons ? 'opacity-100' : 'opacity-0'
+                className={`player-edge-padding absolute left-0 top-0 bottom-0 flex items-center justify-center transition-opacity duration-300 z-10 ${showNavButtons ? 'opacity-100' : 'opacity-0'
                     }`}
                 style={{ pointerEvents: showNavButtons ? 'auto' : 'none' }}
             >
@@ -181,16 +219,16 @@ export function DesktopOverlay({
                         e.stopPropagation();
                         onSkipBackward();
                     }}
-                    className="group flex items-center justify-center w-10 h-10 md:w-16 md:h-16 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer"
+                    className="group flex items-center justify-center w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer"
                     aria-label={`后退 ${seekStepSeconds} 秒`}
                 >
-                    <Icons.SkipBack className="w-5 h-5 md:w-8 md:h-8 text-white/80 group-hover:text-white" />
+                    <Icons.Rewind className="w-5 h-5 text-white/80 group-hover:text-white" />
                 </button>
             </div>
 
-            {/* Next Button (Method: Skip Forward) - Refined to use FastForward icon */}
+            {/* Next Button - 垂直居中，右边缘与控制条右侧按钮对齐 */}
             <div
-                className={`absolute right-0 top-0 bottom-0 flex items-center justify-center p-4 md:p-8 transition-opacity duration-300 z-10 ${showNavButtons ? 'opacity-100' : 'opacity-0'
+                className={`player-edge-padding absolute right-0 top-0 bottom-0 flex items-center justify-center transition-opacity duration-300 z-10 ${showNavButtons ? 'opacity-100' : 'opacity-0'
                     }`}
                 style={{ pointerEvents: showNavButtons ? 'auto' : 'none' }}
             >
@@ -199,10 +237,10 @@ export function DesktopOverlay({
                         e.stopPropagation();
                         onSkipForward();
                     }}
-                    className="group flex items-center justify-center w-10 h-10 md:w-16 md:h-16 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer"
+                    className="group flex items-center justify-center w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer"
                     aria-label={`前进 ${seekStepSeconds} 秒`}
                 >
-                    <Icons.FastForward className="w-5 h-5 md:w-8 md:h-8 text-white/80 group-hover:text-white" />
+                    <Icons.FastForward className="w-5 h-5 text-white/80 group-hover:text-white" />
                 </button>
             </div>
 

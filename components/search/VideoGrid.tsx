@@ -21,7 +21,6 @@ export const VideoGrid = memo(function VideoGrid({
   isPremium = false,
   latencies = {}
 }: VideoGridProps) {
-  const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(24);
   const [displayMode, setDisplayMode] = useState<'normal' | 'grouped'>('normal');
   const gridRef = useRef<HTMLDivElement>(null);
@@ -70,15 +69,6 @@ export const VideoGrid = memo(function VideoGrid({
     return () => unsubscribe();
   }, [pathname, searchParams, videos.length]);
 
-  // Build stable list of videos to probe for resolution
-  const videosToProbe = useMemo(() => {
-    if (displayMode === 'grouped') {
-      // For grouped mode, will probe after grouping
-      return [];
-    }
-    return videos.map(v => ({ id: String(v.vod_id), source: v.source }));
-  }, [videos, displayMode]);
-
   // Group videos by name when in grouped mode
   const groupedVideos = useMemo<GroupedVideo[]>(() => {
     if (displayMode !== 'grouped') return [];
@@ -124,20 +114,6 @@ export const VideoGrid = memo(function VideoGrid({
     }
   }, []);
 
-  // Memoize the click handler
-  const handleCardClick = useCallback((e: React.MouseEvent, videoId: string, videoUrl: string) => {
-    const isMobile = window.innerWidth < 1024;
-
-    if (isMobile) {
-      if (activeCardId === videoId) {
-        window.location.href = videoUrl;
-      } else {
-        e.preventDefault();
-        setActiveCardId(videoId);
-      }
-    }
-  }, [activeCardId]);
-
   // Normal mode items
   const videoItems = useMemo(() => {
     if (displayMode === 'grouped') return [];
@@ -177,8 +153,8 @@ export const VideoGrid = memo(function VideoGrid({
     return groupedVideos.map(g => ({ id: String(g.representative.vod_id), source: g.representative.source }));
   }, [groupedVideos, displayMode]);
 
-  // Probe resolutions
-  const probeList = displayMode === 'grouped' ? groupedProbeList : videosToProbe;
+  // 分组模式才需要探测分辨率，普通卡片不再展示分辨率
+  const probeList = displayMode === 'grouped' ? groupedProbeList : [];
   const { resolutions, isProbing } = useResolutionProbe(probeList);
 
   const totalItems = displayMode === 'grouped' ? groupItems.length : videoItems.length;
@@ -192,21 +168,18 @@ export const VideoGrid = memo(function VideoGrid({
     <>
       <div
         ref={gridRef}
-        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6 max-w-[1920px] mx-auto ${className}`}
+        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4 lg:gap-6 max-w-[1920px] mx-auto ${className}`}
         role="list"
         aria-label="视频搜索结果"
       >
         {displayMode === 'grouped' ? (
           // Grouped mode
           groupItems.slice(0, visibleCount).map(({ group, cardId }) => {
-            const isActive = activeCardId === cardId;
             return (
               <VideoGroupCard
                 key={cardId}
                 group={group}
                 cardId={cardId}
-                isActive={isActive}
-                onCardClick={handleCardClick}
                 isPremium={isPremium}
                 latencies={latencies}
                 resolution={resolutions[`${group.representative.source}:${group.representative.vod_id}`]}
@@ -217,19 +190,13 @@ export const VideoGrid = memo(function VideoGrid({
         ) : (
           // Normal mode
           videoItems.slice(0, visibleCount).map(({ video, videoUrl, cardId }) => {
-            const isActive = activeCardId === cardId;
             return (
               <VideoCard
                 key={cardId}
                 video={video}
                 videoUrl={videoUrl}
                 cardId={cardId}
-                isActive={isActive}
-                onCardClick={handleCardClick}
-                isPremium={isPremium}
                 latencies={latencies}
-                resolution={resolutions[`${video.source}:${video.vod_id}`]}
-                isProbing={isProbing && !resolutions[`${video.source}:${video.vod_id}`]}
               />
             );
           })

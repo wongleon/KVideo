@@ -10,10 +10,55 @@ import { useLatencyPing } from '@/lib/hooks/useLatencyPing';
 import { useSearchHistoryStoreSelector } from '@/lib/store/search-history-store';
 import { settingsStore } from '@/lib/store/settings-store';
 import { userSourcesStore } from '@/lib/store/user-sources-store';
+import type { Video, SourceBadge } from '@/lib/types';
 
 // 搜索页不写入首页搜索缓存，也不改写地址栏，避免影响首页回显
 const noopCacheUpdate = () => undefined;
 const noopUrlUpdate = () => undefined;
+
+// 搜索页结果缓存：从播放页返回时直接恢复上次结果，避免重新请求
+const SEARCH_PAGE_CACHE_KEY = 'kvideo_search_page_cache';
+// 缓存有效期，超过后视为过期，重新搜索
+const SEARCH_PAGE_CACHE_TTL = 30 * 60 * 1000;
+
+function readSearchPageCache(): { query: string; results: Video[]; availableSources: SourceBadge[] } | null {
+  try {
+    const raw = sessionStorage.getItem(SEARCH_PAGE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.query !== 'string' || !parsed.query || !Array.isArray(parsed?.results)) return null;
+    if (typeof parsed?.timestamp === 'number' && Date.now() - parsed.timestamp > SEARCH_PAGE_CACHE_TTL) {
+      sessionStorage.removeItem(SEARCH_PAGE_CACHE_KEY);
+      return null;
+    }
+    return {
+      query: parsed.query,
+      results: parsed.results,
+      availableSources: Array.isArray(parsed.availableSources) ? parsed.availableSources : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSearchPageCache(query: string, results: Video[], availableSources: SourceBadge[]) {
+  try {
+    sessionStorage.setItem(
+      SEARCH_PAGE_CACHE_KEY,
+      JSON.stringify({ query, results, availableSources, timestamp: Date.now() })
+    );
+  } catch {
+    // 存储空间不足等场景下忽略，不影响正常搜索
+  }
+}
+
+function clearSearchPageCache() {
+  try {
+    sessionStorage.removeItem(SEARCH_PAGE_CACHE_KEY);
+  } catch {
+    // 忽略
+  }
+}
 
 export default function SearchPage() {
   const router = useRouter();
@@ -31,6 +76,7 @@ export default function SearchPage() {
     performSearch,
     resetSearch,
     cancelSearch,
+    loadCachedResults,
   } = useParallelSearch(noopCacheUpdate, noopUrlUpdate);
 
   // 合并内置源与用户自定义源后执行搜索
@@ -39,7 +85,8 @@ export default function SearchPage() {
     if (!trimmed) return;
 
     const settings = settingsStore.getSettings();
-    const allSources = settings.sources.filter((source) => source.enabled);
+    // enabled 为可选字段，未显式关闭的源都应参与搜索
+    const allSources = settings.sources.filter((source) => source.enabled !== false);
     const userSources = userSourcesStore.getSources().filter((source) => source.enabled !== false);
     for (const userSource of userSources) {
       if (!allSources.find((source) => source.id === userSource.id)) {
@@ -55,10 +102,21 @@ export default function SearchPage() {
     performSearch(trimmed, allSources, settings.sortBy);
   }, [addToSearchHistory, performSearch]);
 
-  // 首次挂载时读取 URL 中的 q 参数并自动搜索（首页影片卡片跳转会带上该参数）
+  // 首次挂载时优先恢复上次搜索结果；若有新的 q 参数则按参数搜索
   const lastInitialQueryRef = useRef<string | null>(null);
   useEffect(() => {
     const initialQuery = new URLSearchParams(window.location.search).get('q')?.trim();
+    const cached = readSearchPageCache();
+
+    // URL 未带查询词，或与缓存查询词一致时，直接恢复缓存结果，避免重新请求
+    if (cached && (!initialQuery || cached.query === initialQuery)) {
+      lastInitialQueryRef.current = cached.query;
+      setQuery(cached.query);
+      setHasSearched(true);
+      loadCachedResults(cached.results, cached.availableSources);
+      return;
+    }
+
     if (!initialQuery) return;
 
     // 延后到下一个任务执行，避免在 effect 内同步触发状态更新
@@ -69,7 +127,13 @@ export default function SearchPage() {
       executeSearch(initialQuery);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [executeSearch]);
+  }, [executeSearch, loadCachedResults]);
+
+  // 搜索结束后写入缓存，便于从播放页返回时恢复
+  useEffect(() => {
+    if (!hasSearched || loading || !query) return;
+    writeSearchPageCache(query, results, availableSources);
+  }, [hasSearched, loading, query, results, availableSources]);
 
   // 实时延迟探测，与首页搜索结果保持一致
   const sourceUrls = useMemo(
@@ -90,6 +154,7 @@ export default function SearchPage() {
     setQuery('');
     setHasSearched(false);
     resetSearch();
+    clearSearchPageCache();
   };
 
   const handleHistoryClick = (historyQuery: string) => {
