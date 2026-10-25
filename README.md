@@ -420,7 +420,7 @@ NEXT_PUBLIC_SITE_DESCRIPTION=专属视频聚合播放平台
 
 ## Docker 图标自定义
 
-Docker 预构建镜像支持在运行时替换图标，无需重新构建镜像。该配置会作用于顶部 Logo 和浏览器 favicon；如果你还要同步替换安装后的 PWA 图标，请直接覆盖仓库中的 `public/icon.png` 后重新构建镜像。
+Docker 预构建镜像支持在运行时替换图标，无需重新构建镜像。该配置会作用于顶部 Logo 和浏览器 favicon；如果你还要同步替换安装后的 PWA 图标，请直接覆盖仓库中的 `public/icon.png` 后重新构建镜像。iOS「添加到主屏幕」使用独立的 180x180 静态图标 `public/apple-touch-icon.png`，替换图标时请一并更新该文件。
 
 ### 可用环境变量：
 

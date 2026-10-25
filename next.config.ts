@@ -118,6 +118,31 @@ const nextConfig: NextConfig = {
     formats: ['image/webp'],
     minimumCacheTTL: 60,
   },
+
+  // 图标与 manifest 属于低频变更资源，长缓存可避免 iOS「添加到主屏幕」时重复拉取
+  async headers() {
+    const staticAssetHeaders = [
+      {
+        key: 'Cache-Control',
+        value: 'public, max-age=604800, stale-while-revalidate=86400',
+      },
+    ];
+
+    return [
+      { source: '/apple-touch-icon.png', headers: staticAssetHeaders },
+      { source: '/icon.png', headers: staticAssetHeaders },
+      { source: '/logo.png', headers: staticAssetHeaders },
+      {
+        source: '/manifest.json',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=3600',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

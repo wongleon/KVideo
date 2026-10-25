@@ -19,7 +19,7 @@ import { RuntimeFeaturesProvider } from "@/components/RuntimeFeaturesProvider";
 import { VideoTogetherController } from '@/components/VideoTogetherController';
 import { shouldEnableVercelAnalytics } from '@/lib/config/deployment';
 import { getRuntimeFeatures } from "@/lib/server/runtime-features";
-import { resolveSiteIconSrc } from '@/lib/server/site-icon';
+import { resolveAppleTouchIconSrc, resolveSiteIconSrc } from '@/lib/server/site-icon';
 import fs from 'fs';
 import path from 'path';
 
@@ -67,12 +67,15 @@ async function AdKeywordsWrapper() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteIconSrc = await resolveSiteIconSrc();
+  const appleTouchIconSrc = await resolveAppleTouchIconSrc();
 
   return {
     title: siteConfig.title,
     description: siteConfig.description,
     icons: {
       icon: siteIconSrc,
+      // 明确声明 180x180，避免 iOS 反复探测尺寸而拖慢「添加到主屏幕」
+      apple: [{ url: appleTouchIconSrc, sizes: '180x180', type: 'image/png' }],
     },
   };
 }
@@ -99,7 +102,7 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="小视界" />
-        <link rel="apple-touch-icon" href={siteIconSrc} />
+        {/* apple-touch-icon 由 generateMetadata 输出，固定 180x180 静态 PNG */}
         {/* Theme Color (for browser address bar) */}
         <meta name="theme-color" content="#f2f4f7" />
         <meta name="color-scheme" content="light dark" />

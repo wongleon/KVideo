@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 
 export const DEFAULT_SITE_ICON_PATH = '/icon.png';
+// iOS 主屏幕图标需要固定尺寸且可直接下载的 PNG，统一指向预生成的 180x180 静态资源
+export const DEFAULT_APPLE_TOUCH_ICON_PATH = '/apple-touch-icon.png';
 const LEGACY_SITE_ICON_ROUTE = '/api/site-icon';
 
 function getMimeType(filePath: string): string {
@@ -100,4 +102,23 @@ export async function resolveSiteIconSrc(): Promise<string> {
   }
 
   return DEFAULT_SITE_ICON_PATH;
+}
+
+/**
+ * 解析 iOS「添加到主屏幕」使用的图标地址。
+ * data URL / SVG / 本地文件无法被 iOS 直接用作主屏幕图标（会触发多次探测导致取图缓慢），
+ * 因此只有可直接访问的 PNG 地址才复用，其余场景统一回落到预生成的 180x180 静态图标。
+ */
+export async function resolveAppleTouchIconSrc(): Promise<string> {
+  const candidate = normalizeIconUrl(
+    process.env.SITE_ICON_RESOLVED_URL ||
+      process.env.SITE_ICON_URL?.trim() ||
+      process.env.NEXT_PUBLIC_SITE_ICON_URL?.trim(),
+  );
+
+  if (candidate && !candidate.startsWith('data:') && /\.png(\?.*)?$/i.test(candidate)) {
+    return candidate;
+  }
+
+  return DEFAULT_APPLE_TOUCH_ICON_PATH;
 }
