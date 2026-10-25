@@ -155,37 +155,6 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
   // 标签栏横向滑动（滚轮 + 鼠标拖动）
   const tagScrollRef = useRef<HTMLDivElement>(null);
   const tagDragRef = useRef({ isDown: false, moved: false, startX: 0, startScrollLeft: 0 });
-  // 标签栏是否已吸顶
-  const [isTagBarStuck, setIsTagBarStuck] = useState(false);
-  // 吸顶状态下切换标签后暂时隐藏轮播图
-  const [carouselSuppressed, setCarouselSuppressed] = useState(false);
-
-  // 监听滚动，判断标签栏是否处于吸顶状态
-  useEffect(() => {
-    const updateStuck = () => {
-      const container = tagScrollRef.current;
-      if (!container) return;
-      // 与标签栏 sticky top 保持一致（移动端 64px，桌面 88px）
-      const stickyTop = window.matchMedia('(min-width: 640px)').matches ? 88 : 64;
-      setIsTagBarStuck(container.getBoundingClientRect().top <= stickyTop + 4);
-    };
-
-    updateStuck();
-    window.addEventListener('scroll', updateStuck, { passive: true });
-    window.addEventListener('resize', updateStuck);
-
-    return () => {
-      window.removeEventListener('scroll', updateStuck);
-      window.removeEventListener('resize', updateStuck);
-    };
-  }, []);
-
-  // 回到页面顶部（不再吸顶）时恢复轮播图
-  useEffect(() => {
-    if (!isTagBarStuck) {
-      setCarouselSuppressed(false);
-    }
-  }, [isTagBarStuck]);
 
   useEffect(() => {
     const container = tagScrollRef.current;
@@ -283,11 +252,9 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
 
   return (
     <div className="animate-fade-in">
-      {/* 推荐轮播图：切换标签时保留，仅在吸顶状态下切换标签后隐藏 */}
+      {/* 推荐轮播图：切换标签时始终保留 */}
       {carouselMovies.length > 0 && (
-        <div className={carouselSuppressed ? 'invisible' : ''}>
-          <RecommendCarousel movies={carouselMovies} onMovieClick={handleMovieClick} />
-        </div>
+        <RecommendCarousel movies={carouselMovies} onMovieClick={handleMovieClick} />
       )}
 
       {/* 固定筛选标签：支持滚轮与鼠标拖动横向滑动 */}
@@ -308,8 +275,6 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
               key={filter.id}
               type="button"
               onClick={() => {
-                // 吸顶状态下切换标签时隐藏轮播图
-                setCarouselSuppressed(isTagBarStuck);
                 setSelectedFilterId(filter.id);
               }}
               aria-pressed={isSelected}
