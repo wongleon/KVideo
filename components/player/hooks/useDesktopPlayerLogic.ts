@@ -124,20 +124,21 @@ export function useDesktopPlayerLogic({
         skipForwardTimeoutRef, skipBackwardTimeoutRef
     });
 
+    const utilities = useUtilities({
+        src, setToastMessage, setShowToast, toastTimeoutRef
+    });
+
     const fullscreenControls = useFullscreenControls({
         containerRef, videoRef, setIsFullscreen, fullscreenMode, setFullscreenMode,
         isPiPSupported, isAirPlaySupported, setIsPiPSupported, setIsAirPlaySupported,
-        fullscreenType
+        fullscreenType,
+        onPiPUnavailable: utilities.showToastNotification
     });
 
     const controlsVisibility = useControlsVisibility({
         isPlaying, showControls, showSpeedMenu, showMoreMenu,
         setShowControls, setShowSpeedMenu, setShowMoreMenu,
         controlsTimeoutRef, speedMenuTimeoutRef, mouseMoveThrottleRef
-    });
-
-    const utilities = useUtilities({
-        src, setToastMessage, setShowToast, toastTimeoutRef
     });
 
     const castControls = useCastControls({

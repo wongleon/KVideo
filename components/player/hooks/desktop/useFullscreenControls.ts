@@ -57,6 +57,28 @@ type PiPCapableVideoElement = HTMLVideoElement & {
     webkitShowPlaybackTargetPicker?: () => void;
 };
 
+type NavigatorWithStandalone = Navigator & { standalone?: boolean };
+
+/** iOS 主屏幕 PWA（standalone）受 WebKit 限制，无法进入画中画 */
+export function isIosStandaloneWebApp(): boolean {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+        return false;
+    }
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!isIOS) {
+        return false;
+    }
+
+    if ((navigator as NavigatorWithStandalone).standalone === true) {
+        return true;
+    }
+
+    return window.matchMedia?.('(display-mode: standalone)').matches === true ||
+        window.matchMedia?.('(display-mode: fullscreen)').matches === true;
+}
+
 function getFullscreenDocument(): FullscreenCapableDocument {
     return document as FullscreenCapableDocument;
 }
@@ -116,6 +138,8 @@ interface UseFullscreenControlsProps {
     setIsPiPSupported: (supported: boolean) => void;
     setIsAirPlaySupported: (supported: boolean) => void;
     fullscreenType?: 'native' | 'window';
+    /** 画中画不可用时的提示回调（例如 iOS 主屏幕 PWA 环境） */
+    onPiPUnavailable?: (message: string) => void;
 }
 
 export function useFullscreenControls({
@@ -128,7 +152,8 @@ export function useFullscreenControls({
     isAirPlaySupported,
     setIsPiPSupported,
     setIsAirPlaySupported,
-    fullscreenType = 'native'
+    fullscreenType = 'native',
+    onPiPUnavailable
 }: UseFullscreenControlsProps) {
     const androidPiPSessionRef = useRef<AndroidPiPSessionState | null>(null);
 
@@ -458,8 +483,26 @@ export function useFullscreenControls({
         return () => window.removeEventListener('kvideo-android-pip-change', handleAndroidPiPChange);
     }, [exitWindowFullscreen]);
 
+    const enterWebkitPictureInPicture = useCallback((video: PiPCapableVideoElement) => {
+        video.webkitSetPresentationMode?.('picture-in-picture');
+
+        // 部分 WebKit 环境（如第三方 App 内嵌 WKWebView）会静默失败，进入后校验一次
+        window.setTimeout(() => {
+            if (video.webkitPresentationMode !== 'picture-in-picture') {
+                onPiPUnavailable?.('当前环境无法使用画中画，请尝试用 Safari 打开本页面');
+            }
+        }, 600);
+    }, [onPiPUnavailable]);
+
     const togglePictureInPicture = useCallback(async () => {
+        // iOS 主屏幕 PWA（standalone）受 WebKit 限制，无法进入画中画
+        if (isIosStandaloneWebApp()) {
+            onPiPUnavailable?.('iOS 主屏幕应用不支持画中画，请在 Safari 中打开本页面');
+            return;
+        }
+
         if (!videoRef.current || !isPiPSupported) return;
+
         const video = videoRef.current as PiPCapableVideoElement;
         const fullscreenDocument = getFullscreenDocument();
 
@@ -494,7 +537,7 @@ export function useFullscreenControls({
                 video.webkitSupportsPresentationMode?.('picture-in-picture') &&
                 video.webkitSetPresentationMode
             ) {
-                video.webkitSetPresentationMode('picture-in-picture');
+                enterWebkitPictureInPicture(video);
             }
         } catch (error) {
             // iOS 回退：部分 Safari 版本仅支持 webkit 专有 API，标准 API 会直接抛错
@@ -503,7 +546,7 @@ export function useFullscreenControls({
                 video.webkitSetPresentationMode
             ) {
                 try {
-                    video.webkitSetPresentationMode('picture-in-picture');
+                    enterWebkitPictureInPicture(video);
                     return;
                 } catch {
                     // 继续尝试其他方案
@@ -514,7 +557,7 @@ export function useFullscreenControls({
             }
             console.error('Failed to toggle Picture-in-Picture:', error);
         }
-    }, [isPiPSupported, requestAndroidPictureInPicture, videoRef]);
+    }, [enterWebkitPictureInPicture, isPiPSupported, onPiPUnavailable, requestAndroidPictureInPicture, videoRef]);
 
     const showAirPlayMenu = useCallback(() => {
         if (!videoRef.current || !isAirPlaySupported) return;
