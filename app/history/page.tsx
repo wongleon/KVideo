@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useHistory } from '@/lib/store/history-store';
-import { useFavorites } from '@/lib/store/favorites-store';
+import { useCallback, useEffect, useState } from 'react';
+import { useHistory, useHistoryStore } from '@/lib/store/history-store';
+import { useFavorites, useFavoritesStore } from '@/lib/store/favorites-store';
+import { useCloudSync } from '@/lib/hooks/useCloudSync';
 import { HistoryList } from '@/components/history/HistoryList';
 import { FavoritesList } from '@/components/favorites/FavoritesList';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -21,6 +22,36 @@ const LIST_OPTIONS: { value: ListMode; label: string }[] = [
 export default function HistoryPage() {
   const { viewingHistory, removeFromHistory, clearHistory } = useHistory();
   const { favorites, removeFavorite, clearFavorites } = useFavorites();
+  const { pullFromCloud } = useCloudSync();
+
+  // 重新读取最新数据：先重新水合本地存储，再合并拉取云端记录。
+  // 合并而不是覆盖，避免云端还没收到最新推送时把刚看完的记录冲掉。
+  const syncLatest = useCallback(() => {
+    void useHistoryStore.persist.rehydrate();
+    void useFavoritesStore.persist.rehydrate();
+    pullFromCloud({ merge: true });
+  }, [pullFromCloud]);
+
+  useEffect(() => {
+    syncLatest();
+
+    // 手机 Safari 从播放器返回时可能命中前进/后退缓存，或从后台恢复时不重新挂载页面，
+    // 这些时机需要主动再同步一次
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) syncLatest();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') syncLatest();
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [syncLatest]);
 
   const [mode, setMode] = useState<ListMode>('history');
   const [isPickerOpen, setIsPickerOpen] = useState(false);

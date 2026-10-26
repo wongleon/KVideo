@@ -1,8 +1,18 @@
 import { useState, useCallback } from 'react';
 import { useHistoryStore, usePremiumHistoryStore } from '@/lib/store/history-store';
 import { useFavoritesStore, usePremiumFavoritesStore } from '@/lib/store/favorites-store';
-import { keepRenderableFavorites, keepRenderableHistory } from '@/lib/utils/sync-records';
+import {
+  keepRenderableFavorites,
+  keepRenderableHistory,
+  mergeFavoriteRecords,
+  mergeHistoryRecords,
+} from '@/lib/utils/sync-records';
 import { getProfileId } from '@/lib/store/auth-store';
+
+interface PullOptions {
+  /** 合并本地较新的记录，避免云端旧数据覆盖刚产生的观看/收藏记录 */
+  merge?: boolean;
+}
 
 export function useCloudSync(isPremium = false) {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -10,7 +20,7 @@ export function useCloudSync(isPremium = false) {
   const historyStore = isPremium ? usePremiumHistoryStore : useHistoryStore;
   const favoritesStore = isPremium ? usePremiumFavoritesStore : useFavoritesStore;
 
-  const pullFromCloud = useCallback(async () => {
+  const pullFromCloud = useCallback(async (options?: PullOptions) => {
     const profileId = getProfileId();
     if (!profileId) return;
 
@@ -22,6 +32,16 @@ export function useCloudSync(isPremium = false) {
       if (result.success && result.data) {
         const history = keepRenderableHistory(result.data.history);
         const favorites = keepRenderableFavorites(result.data.favorites);
+
+        if (options?.merge) {
+          historyStore.getState().importHistory(
+            mergeHistoryRecords(historyStore.getState().viewingHistory, history)
+          );
+          favoritesStore.getState().importFavorites(
+            mergeFavoriteRecords(favoritesStore.getState().favorites, favorites)
+          );
+          return;
+        }
 
         if (history.length > 0) {
           historyStore.getState().importHistory(history);
