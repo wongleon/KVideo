@@ -91,6 +91,12 @@ export interface VideoDetail {
 }
 
 // History Entry
+export interface HistorySourceEntry {
+  id: string | number;
+  source: string;
+  sourceName?: string;
+}
+
 export interface VideoHistoryItem {
   videoId: string | number;
   title: string;
@@ -104,6 +110,7 @@ export interface VideoHistoryItem {
   episodes: Episode[];
   showIdentifier: string; // Unique identifier for deduplication
   sourceMap?: Record<string, string | number>; // Maps source name to videoId for that source
+  sources?: HistorySourceEntry[]; // 播放页已知的完整线路列表，用于从历史返回时保持源一致
   vod_actor?: string;
   type_name?: string;
   vod_area?: string;

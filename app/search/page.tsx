@@ -98,11 +98,12 @@ export default function SearchPage() {
     return () => window.clearTimeout(timer);
   }, [executeSearch, loadCachedResults]);
 
-  // 搜索结束后写入缓存，便于从播放页返回时恢复
+  // 搜索过程中也实时写入缓存：未等搜索完成就进入播放页时，
+  // 返回后按当时的搜索结果展示（视为搜索已完成）
   useEffect(() => {
-    if (!hasSearched || loading || !query) return;
+    if (!hasSearched || !query) return;
     writeSearchPageCache({ query, results, availableSources, selectedSource });
-  }, [hasSearched, loading, query, results, availableSources, selectedSource]);
+  }, [hasSearched, query, results, availableSources, selectedSource]);
 
   // 实时延迟探测，与首页搜索结果保持一致
   const sourceUrls = useMemo(

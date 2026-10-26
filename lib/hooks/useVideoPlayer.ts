@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { settingsStore } from '@/lib/store/settings-store';
+import { userSourcesStore } from '@/lib/store/user-sources-store';
 
 interface VideoData {
   vod_id: string;
@@ -79,6 +80,7 @@ export function useVideoPlayer(
         ...settings.sources,
         ...settings.premiumSources,
         ...settings.subscriptions,
+        ...userSourcesStore.getSources(),
       ];
 
       const sourceConfig = allSources.find(s => s.id === source);

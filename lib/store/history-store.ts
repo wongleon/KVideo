@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { VideoHistoryItem, Episode } from '@/lib/types';
+import type { VideoHistoryItem, Episode, HistorySourceEntry } from '@/lib/types';
 import { clearSegmentsForUrl, clearAllCache } from '@/lib/utils/cacheManager';
 import { profiledKey } from '@/lib/utils/profile-storage';
 
@@ -30,6 +30,8 @@ interface HistoryActions {
   ) => void;
 
   removeFromHistory: (showIdentifier: string) => void;
+  /** 更新某个视频已知的完整线路列表，用于从历史进入播放页时保持源一致 */
+  updateHistorySources: (title: string, sources: HistorySourceEntry[]) => void;
   clearHistory: () => void;
   importHistory: (history: VideoHistoryItem[]) => void;
 }
@@ -195,6 +197,34 @@ const createHistoryStore = (name: string) =>
               (item) => item.showIdentifier !== showIdentifier
             ),
           }));
+        },
+
+        updateHistorySources: (title, sources) => {
+          if (sources.length === 0) return;
+          const showIdentifier = generateShowIdentifier(title);
+
+          set((state) => {
+            const index = state.viewingHistory.findIndex(
+              (item) => item.showIdentifier === showIdentifier
+            );
+            if (index === -1) return state;
+
+            const current = state.viewingHistory[index];
+            // 线路列表未变化时不更新，避免无意义的持久化写入
+            const unchanged = current.sources !== undefined &&
+              current.sources.length === sources.length &&
+              current.sources.every((entry, entryIndex) => {
+                const next = sources[entryIndex];
+                return entry.source === next.source &&
+                  String(entry.id) === String(next.id) &&
+                  entry.sourceName === next.sourceName;
+              });
+            if (unchanged) return state;
+
+            const nextHistory = [...state.viewingHistory];
+            nextHistory[index] = { ...current, sources };
+            return { viewingHistory: nextHistory };
+          });
         },
 
         clearHistory: () => {

@@ -18,6 +18,7 @@ import { MobileVideoInfo } from '@/components/player/MobileVideoInfo';
 import { YouMayAlsoLike } from '@/components/player/YouMayAlsoLike';
 import { htmlToText } from '@/lib/utils/html';
 import { settingsStore } from '@/lib/store/settings-store';
+import { userSourcesStore } from '@/lib/store/user-sources-store';
 import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
 import { getSourceName } from '@/lib/utils/source-names';
 import { retrieveGroupedSources, storeGroupedSources } from '@/lib/utils/grouped-sources-cache';
@@ -31,7 +32,7 @@ function PlayerContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const isPremium = searchParams.get('premium') === '1';
-  const { addToHistory } = useHistory(isPremium);
+  const { addToHistory, updateHistorySources } = useHistory(isPremium);
 
   const videoId = searchParams.get('id');
   const source = searchParams.get('source');
@@ -171,7 +172,7 @@ function PlayerContent() {
     const settings = settingsStore.getSettings();
     const configSources = isPremium ? settings.premiumSources : settings.sources;
     const configuredNames = new Map<string, string>(
-      (configSources ?? []).map((item) => [item.id, item.name])
+      [...(configSources ?? []), ...userSourcesStore.getSources()].map((item) => [item.id, item.name])
     );
 
     sources = sources.map((item) => ({
@@ -215,20 +216,28 @@ function PlayerContent() {
       try { existingSources = JSON.parse(groupedSourcesParam); } catch {}
     }
     // Always fetch alternatives if there's a pending fallback (source unavailable)
+    // 只有每个源都带有延迟信息才视为数据完整；历史/收藏传入的线路只有海报，
+    // 需要再补全一次，保证与从搜索进入播放页时的源列表一致
     const hasFullInfo = !pendingFallback && existingSources.length > 1 &&
-      existingSources.every(s => s.pic || s.latency !== undefined);
+      existingSources.every(s => s.latency !== undefined);
     if (hasFullInfo) return;
 
     fetchedSourcesRef.current = true;
 
     const settings = settingsStore.getSettings();
     const sourcesForMode = isPremium ? settings.premiumSources : settings.sources;
-    const allSources = sourcesForMode?.filter((s: VideoSource) => s.enabled !== false) || [];
+    // 用户自定义源同样参与搜索，否则从历史进入时线路会被漏掉
+    const allSources = [
+      ...(sourcesForMode ?? []),
+      ...userSourcesStore.getSources(),
+    ].filter((s: VideoSource) => s.enabled !== false);
     // Only search other sources (not the current one)
     const otherSources = allSources.filter((s: VideoSource) => s.id !== source);
     if (otherSources.length === 0) return;
 
     const controller = new AbortController();
+    // 请求被中断时允许重新发起（例如 React 严格模式下的首次挂载会被立即清理）
+    let finished = false;
 
     (async () => {
       try {
@@ -290,10 +299,17 @@ function PlayerContent() {
         }
       } catch {
         // Silently ignore - this is a background enhancement
+      } finally {
+        finished = true;
       }
     })();
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (!finished) {
+        fetchedSourcesRef.current = false;
+      }
+    };
   }, [groupedSourcesParam, gsKey, isPremium, pendingFallback, source, title]);
 
   // Track current source for switching
@@ -352,6 +368,20 @@ function PlayerContent() {
       );
     }
   }, [videoData, playUrl, videoId, currentEpisode, source, title, addToHistory]);
+
+  // 把已知的完整线路列表写回历史记录，保证从历史进入播放页时源列表与之前一致
+  useEffect(() => {
+    if (!videoData || !playUrl) return;
+
+    updateHistorySources(
+      videoData.vod_name || title || '未知视频',
+      groupedSources.map((item) => ({
+        id: item.id,
+        source: item.source,
+        sourceName: item.sourceName,
+      }))
+    );
+  }, [groupedSources, playUrl, title, updateHistorySources, videoData]);
 
   const handleEpisodeClick = useCallback((episode: { url: string }, index: number) => {
     setCurrentEpisode(index);

@@ -19,6 +19,39 @@ interface HistoryItemProps {
 }
 
 export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemProps) {
+  // 优先使用播放页记录的完整线路列表，旧记录回退到 sourceMap
+  const getGroupedSources = () => {
+    if (item.sources && item.sources.length > 0) {
+      const list = item.sources.map((entry) => ({
+        id: entry.id,
+        source: entry.source,
+        sourceName: entry.sourceName || getSourceName(entry.source),
+        pic: item.poster,
+      }));
+      // 确保当前播放的线路在列表中，避免播放页再追加一条同源线路
+      if (!list.some((entry) => entry.source === item.source && String(entry.id) === String(item.videoId))) {
+        list.unshift({
+          id: item.videoId,
+          source: item.source,
+          sourceName: getSourceName(item.source),
+          pic: item.poster,
+        });
+      }
+      return list;
+    }
+
+    if (item.sourceMap) {
+      return Object.entries(item.sourceMap).map(([sourceName, videoId]) => ({
+        id: videoId,
+        source: sourceName,
+        sourceName: getSourceName(sourceName),
+        pic: item.poster,
+      }));
+    }
+
+    return [];
+  };
+
   const getVideoUrl = (): string => {
     const params = new URLSearchParams({
       id: item.videoId.toString(),
@@ -26,14 +59,9 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
       title: item.title,
       episode: item.episodeIndex.toString(),
     });
-    // Store sourceMap in sessionStorage to avoid long URLs
-    if (item.sourceMap && Object.keys(item.sourceMap).length > 1) {
-      const groupData = Object.entries(item.sourceMap).map(([sourceName, videoId]) => ({
-        id: videoId,
-        source: sourceName,
-        sourceName: getSourceName(sourceName),
-        pic: item.poster,
-      }));
+    // Store groupedSources in sessionStorage to avoid long URLs
+    const groupData = getGroupedSources();
+    if (groupData.length > 1) {
       const cacheKey = storeGroupedSources(groupData);
       if (cacheKey) {
         params.set('gs', cacheKey);
