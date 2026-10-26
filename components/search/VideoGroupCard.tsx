@@ -24,6 +24,8 @@ export interface GroupedVideo {
     videos: Video[];
     /** Group name (vod_name) */
     name: string;
+    /** 分组年份，空字符串表示该组没有年份信息 */
+    year: string;
 }
 
 interface VideoGroupCardProps {
@@ -43,7 +45,7 @@ export const VideoGroupCard = memo<VideoGroupCardProps>(({
     resolution,
     isProbing = false,
 }) => {
-    const { representative, videos, name } = group;
+    const { representative, videos, name, year } = group;
 
     // Best latency from the group, preferring real-time updates
     const bestLatency = useMemo(() => {
@@ -96,7 +98,7 @@ export const VideoGroupCard = memo<VideoGroupCardProps>(({
                 key={cardId}
                 href={videoUrl}
                 role="listitem"
-                aria-label={`${name} - ${videos.length} 个源${representative.vod_remarks ? ` - ${representative.vod_remarks}` : ''}`}
+                aria-label={`${name}${year ? ` - ${year}` : ''} - ${videos.length} 个源${representative.vod_remarks ? ` - ${representative.vod_remarks}` : ''}`}
                 prefetch={false}
                 data-focusable
                 className="block"
@@ -151,10 +153,10 @@ export const VideoGroupCard = memo<VideoGroupCardProps>(({
                             )}
                         </div>
 
-                        {/* 左下角：年份 */}
-                        {representative.vod_year && (
+                        {/* 左下角：年份（按分组年份显示，缺失则不显示） */}
+                        {year && (
                             <span className="absolute bottom-2 left-2 z-10 rounded-[var(--radius-full)] bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                                {representative.vod_year}
+                                {year}
                             </span>
                         )}
                     </div>

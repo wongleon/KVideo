@@ -11,7 +11,7 @@ import { settingsStore } from '@/lib/store/settings-store';
 import type { VideoResolutionInfo } from './hooks/useVideoResolution';
 import type { ResolutionInfo } from '@/lib/hooks/useResolutionProbe';
 import { getCachedResolution } from '@/lib/player/resolution-cache';
-import { getSourceResolutionBadge, shouldExpandForCurrentSource } from '@/lib/player/source-list-utils';
+import { getSourceResolutionBadge } from '@/lib/player/source-list-utils';
 
 interface Episode {
   name?: string;
@@ -55,6 +55,8 @@ interface EpisodeListProps {
   // Optional source integration props
   sources?: SourceInfo[];
   currentSource?: string;
+  // 当前播放的视频 ID，用于区分同一源下的不同条目（同源不同 ID 视为两条独立线路）
+  currentSourceVideoId?: string | number | null;
   onSourceChange?: (source: SourceInfo) => void;
   // Actual detected resolution for the current source
   currentResolution?: VideoResolutionInfo | null;
@@ -74,6 +76,7 @@ export function EpisodeList({
   onToggleReverse,
   sources,
   currentSource,
+  currentSourceVideoId,
   onSourceChange,
   currentResolution,
   sourceResolutions,
@@ -126,11 +129,28 @@ export function EpisodeList({
     });
   }, [currentResolution, sourceResolutions]);
 
+  // 线路唯一键：同源不同 ID 属于两条独立线路
+  const getSourceItemKey = useCallback(
+    (source: SourceInfo) => `${source.source}:${source.id}`,
+    []
+  );
+
+  const isCurrentSourceItem = useCallback((source: SourceInfo) => {
+    if (source.source !== currentSource) return false;
+    // 未提供当前视频 ID 时退化为按源判断，保持旧行为
+    if (currentSourceVideoId === undefined || currentSourceVideoId === null || currentSourceVideoId === '') {
+      return true;
+    }
+    return String(source.id) === String(currentSourceVideoId);
+  }, [currentSource, currentSourceVideoId]);
+
   // Current source info
   const currentSourceInfo = useMemo(() => {
     if (!sources || !currentSource) return null;
-    return sources.find(s => s.source === currentSource) || null;
-  }, [sources, currentSource]);
+    return sources.find(isCurrentSourceItem) || null;
+  }, [sources, currentSource, isCurrentSourceItem]);
+
+  const currentSourceItemKey = currentSourceInfo ? getSourceItemKey(currentSourceInfo) : '';
 
   // Sort sources by latency
   const initialLatencies = useMemo(() => {
@@ -158,21 +178,21 @@ export function EpisodeList({
   }, [mergedLatencies, sources]);
 
   const isSourceListOpen = !sourceSectionCollapsed && sourceExpanded;
-  const forceExpandedForCurrentSource = !!currentSource && shouldExpandForCurrentSource(sortedSources, currentSource);
+  const forceExpandedForCurrentSource = !!currentSource && sortedSources.findIndex(isCurrentSourceItem) >= 5;
   const showAllVisibleSources = showAllSources || forceExpandedForCurrentSource;
 
   useEffect(() => {
-    if (!isSourceListOpen || !currentSource) return;
+    if (!isSourceListOpen || !currentSourceItemKey) return;
 
     const frame = requestAnimationFrame(() => {
-      sourceItemRefs.current[currentSource]?.scrollIntoView({
+      sourceItemRefs.current[currentSourceItemKey]?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       });
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [currentSource, isSourceListOpen, showAllVisibleSources, sortedSources]);
+  }, [currentSourceItemKey, isSourceListOpen, showAllVisibleSources, sortedSources]);
 
   // Resolve source ID to its actual baseUrl for pinging
   const getSourcePingUrl = useCallback((sourceId: string): string | null => {
@@ -376,11 +396,11 @@ export function EpisodeList({
       {showSourceSelector && (
         <div ref={sourceRailRef} className="lg:hidden mb-4 flex gap-2 overflow-x-auto scrollbar-hide">
           {sortedSources.map((source) => {
-            const isCurrent = source.source === currentSource;
+            const isCurrent = isCurrentSourceItem(source);
 
             return (
               <button
-                key={source.source}
+                key={getSourceItemKey(source)}
                 onClick={() => {
                   if (!isCurrent) onSourceChange!(source);
                 }}
@@ -505,7 +525,7 @@ export function EpisodeList({
                               </div>
                             )}
                             {typeSources.map((source, index) => {
-                              const isCurrent = source.source === currentSource;
+                              const isCurrent = isCurrentSourceItem(source);
                               const latency = mergedLatencies[source.source] ?? source.latency;
                               const globalIndex = sortedSources.indexOf(source);
                               const badge = getResBadge(source, isCurrent);
@@ -513,7 +533,7 @@ export function EpisodeList({
                               return (
                                 <button
                                   key={`${source.source}-${index}`}
-                                  ref={(element) => { sourceItemRefs.current[source.source] = element; }}
+                                  ref={(element) => { sourceItemRefs.current[getSourceItemKey(source)] = element; }}
                                   onClick={() => {
                                     if (!isCurrent) {
                                       onSourceChange!(source);
@@ -586,14 +606,14 @@ export function EpisodeList({
                         ))
                       ) : (
                         visibleSources.map((source, index) => {
-                          const isCurrent = source.source === currentSource;
+                          const isCurrent = isCurrentSourceItem(source);
                           const latency = mergedLatencies[source.source] ?? source.latency;
                           const badge = getResBadge(source, isCurrent);
 
                           return (
                             <button
                               key={`${source.source}-${index}`}
-                              ref={(element) => { sourceItemRefs.current[source.source] = element; }}
+                              ref={(element) => { sourceItemRefs.current[getSourceItemKey(source)] = element; }}
                               onClick={() => {
                                 if (!isCurrent) {
                                   onSourceChange!(source);

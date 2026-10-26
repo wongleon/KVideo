@@ -9,6 +9,10 @@ interface SearchResultsProps {
     loading: boolean;
     isPremium?: boolean;
     latencies?: Record<string, number>;
+    /** 受控的已选源标签，用于从播放页返回时恢复 */
+    selectedSource?: string | null;
+    /** 源标签选择变化回调 */
+    onSourceChange?: (sourceId: string | null) => void;
 }
 
 export function SearchResults({
@@ -17,6 +21,8 @@ export function SearchResults({
     loading,
     isPremium = false,
     latencies = {},
+    selectedSource,
+    onSourceChange,
 }: SearchResultsProps) {
     // 视频源筛选（单选）
     const {
@@ -24,7 +30,10 @@ export function SearchResults({
         filteredVideos,
         toggleSource,
         clearSelection,
-    } = useSourceBadges(results, availableSources);
+    } = useSourceBadges(results, availableSources, {
+        selectedSource,
+        onSelectedSourceChange: onSourceChange,
+    });
 
     if (results.length === 0 && !loading) return null;
 

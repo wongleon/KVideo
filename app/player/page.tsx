@@ -158,7 +158,7 @@ function PlayerContent() {
       }
     }
 
-    if (source && !sources.find((item) => item.source === source)) {
+    if (source && !sources.find((item) => item.source === source && String(item.id) === String(videoId))) {
       sources.unshift({
         id: videoId || '',
         source,
@@ -509,6 +509,7 @@ function PlayerContent() {
                     onToggleReverse={handleToggleReverse}
                     sources={groupedSources.length > 0 ? groupedSources : undefined}
                     currentSource={currentSourceId || source || ''}
+                    currentSourceVideoId={videoId}
                     currentResolution={detectedResolution}
                     sourceResolutions={sourceResolutions}
                     sourceSectionCollapsed={isSourceSectionCollapsed}

@@ -8,6 +8,7 @@
 import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { MovieCard } from '@/components/home/MovieCard';
+import { clearSearchPageCache } from '@/lib/utils/search-page-cache';
 import { useSimilarRecommendations, type SimilarMovie } from './hooks/useSimilarRecommendations';
 
 interface YouMayAlsoLikeProps {
@@ -23,6 +24,8 @@ export function YouMayAlsoLike({ title, typeName, actors, area }: YouMayAlsoLike
 
   const handleMovieClick = useCallback(
     (movie: SimilarMovie) => {
+      // 主动发起新的搜索，清空上次记录，避免回显旧搜索结果
+      clearSearchPageCache();
       router.push(`/search?q=${encodeURIComponent(movie.title)}`);
     },
     [router]

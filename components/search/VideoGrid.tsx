@@ -69,7 +69,7 @@ export const VideoGrid = memo(function VideoGrid({
     return () => unsubscribe();
   }, [pathname, searchParams, videos.length]);
 
-  // Group videos by name when in grouped mode
+  // 分组模式：按「标题 + 年份」合并，年份缺失的条目单独成组
   const groupedVideos = useMemo<GroupedVideo[]>(() => {
     if (displayMode !== 'grouped') return [];
 
@@ -77,13 +77,16 @@ export const VideoGrid = memo(function VideoGrid({
 
     videos.forEach(video => {
       const name = video.vod_name.toLowerCase().trim();
-      if (!groups.has(name)) {
-        groups.set(name, []);
+      const year = (video.vod_year ?? '').trim();
+      // 使用不可见分隔符，避免标题本身含分隔符时误合并
+      const key = `${name}\u0000${year}`;
+      if (!groups.has(key)) {
+        groups.set(key, []);
       }
-      groups.get(name)!.push(video);
+      groups.get(key)!.push(video);
     });
 
-    return Array.from(groups.entries()).map(([, groupVideos]) => {
+    return Array.from(groups.values()).map((groupVideos) => {
       // Sort by latency (lowest first) 
       const sorted = [...groupVideos].sort((a, b) => {
         if (a.latency === undefined) return 1;
@@ -95,6 +98,7 @@ export const VideoGrid = memo(function VideoGrid({
         representative: sorted[0],
         videos: sorted,
         name: sorted[0].vod_name,
+        year: (sorted[0].vod_year ?? '').trim(),
       };
     });
   }, [videos, displayMode]);

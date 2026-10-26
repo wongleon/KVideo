@@ -9,6 +9,7 @@ import { Icons } from '@/components/ui/Icon';
 import { siteConfig } from '@/lib/config/site-config';
 import { getSession, clearSession, hasPermission, type AuthSession } from '@/lib/store/auth-store';
 import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
+import { clearSearchPageCache } from '@/lib/utils/search-page-cache';
 import { LogOut } from 'lucide-react';
 
 interface NavbarProps {
@@ -67,6 +68,7 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
                             {/* Search Entry */}
                             <Link
                                 href="/search"
+                                onClick={() => clearSearchPageCache()}
                                 className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
                                 aria-label="搜索"
                                 title="搜索"

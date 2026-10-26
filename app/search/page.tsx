@@ -10,55 +10,15 @@ import { useLatencyPing } from '@/lib/hooks/useLatencyPing';
 import { useSearchHistoryStoreSelector } from '@/lib/store/search-history-store';
 import { settingsStore } from '@/lib/store/settings-store';
 import { userSourcesStore } from '@/lib/store/user-sources-store';
-import type { Video, SourceBadge } from '@/lib/types';
+import {
+  clearSearchPageCache,
+  readSearchPageCache,
+  writeSearchPageCache,
+} from '@/lib/utils/search-page-cache';
 
 // 搜索页不写入首页搜索缓存，也不改写地址栏，避免影响首页回显
 const noopCacheUpdate = () => undefined;
 const noopUrlUpdate = () => undefined;
-
-// 搜索页结果缓存：从播放页返回时直接恢复上次结果，避免重新请求
-const SEARCH_PAGE_CACHE_KEY = 'kvideo_search_page_cache';
-// 缓存有效期，超过后视为过期，重新搜索
-const SEARCH_PAGE_CACHE_TTL = 30 * 60 * 1000;
-
-function readSearchPageCache(): { query: string; results: Video[]; availableSources: SourceBadge[] } | null {
-  try {
-    const raw = sessionStorage.getItem(SEARCH_PAGE_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (typeof parsed?.query !== 'string' || !parsed.query || !Array.isArray(parsed?.results)) return null;
-    if (typeof parsed?.timestamp === 'number' && Date.now() - parsed.timestamp > SEARCH_PAGE_CACHE_TTL) {
-      sessionStorage.removeItem(SEARCH_PAGE_CACHE_KEY);
-      return null;
-    }
-    return {
-      query: parsed.query,
-      results: parsed.results,
-      availableSources: Array.isArray(parsed.availableSources) ? parsed.availableSources : [],
-    };
-  } catch {
-    return null;
-  }
-}
-
-function writeSearchPageCache(query: string, results: Video[], availableSources: SourceBadge[]) {
-  try {
-    sessionStorage.setItem(
-      SEARCH_PAGE_CACHE_KEY,
-      JSON.stringify({ query, results, availableSources, timestamp: Date.now() })
-    );
-  } catch {
-    // 存储空间不足等场景下忽略，不影响正常搜索
-  }
-}
-
-function clearSearchPageCache() {
-  try {
-    sessionStorage.removeItem(SEARCH_PAGE_CACHE_KEY);
-  } catch {
-    // 忽略
-  }
-}
 
 export default function SearchPage() {
   const router = useRouter();
@@ -66,6 +26,8 @@ export default function SearchPage() {
 
   const [query, setQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  // 当前选中的源标签，随搜索结果一起缓存，便于从播放页返回时恢复
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
 
   const {
     loading,
@@ -99,6 +61,8 @@ export default function SearchPage() {
     addToSearchHistory(trimmed);
     setQuery(trimmed);
     setHasSearched(true);
+    // 新的搜索重新从「全部」源开始
+    setSelectedSource(null);
     performSearch(trimmed, allSources, settings.sortBy);
   }, [addToSearchHistory, performSearch]);
 
@@ -108,13 +72,18 @@ export default function SearchPage() {
     const initialQuery = new URLSearchParams(window.location.search).get('q')?.trim();
     const cached = readSearchPageCache();
 
-    // URL 未带查询词，或与缓存查询词一致时，直接恢复缓存结果，避免重新请求
-    if (cached && (!initialQuery || cached.query === initialQuery)) {
+    // 存在缓存说明是返回场景（首页等主动搜索入口会先清空缓存），
+    // 直接恢复上次结果与所选源标签，避免重新请求
+    if (cached) {
       lastInitialQueryRef.current = cached.query;
-      setQuery(cached.query);
-      setHasSearched(true);
-      loadCachedResults(cached.results, cached.availableSources);
-      return;
+      // 延后到下一个任务执行，避免在 effect 内同步触发状态更新
+      const restoreTimer = window.setTimeout(() => {
+        setQuery(cached.query);
+        setHasSearched(true);
+        setSelectedSource(cached.selectedSource);
+        loadCachedResults(cached.results, cached.availableSources);
+      }, 0);
+      return () => window.clearTimeout(restoreTimer);
     }
 
     if (!initialQuery) return;
@@ -132,8 +101,8 @@ export default function SearchPage() {
   // 搜索结束后写入缓存，便于从播放页返回时恢复
   useEffect(() => {
     if (!hasSearched || loading || !query) return;
-    writeSearchPageCache(query, results, availableSources);
-  }, [hasSearched, loading, query, results, availableSources]);
+    writeSearchPageCache({ query, results, availableSources, selectedSource });
+  }, [hasSearched, loading, query, results, availableSources, selectedSource]);
 
   // 实时延迟探测，与首页搜索结果保持一致
   const sourceUrls = useMemo(
@@ -153,6 +122,7 @@ export default function SearchPage() {
   const handleClear = () => {
     setQuery('');
     setHasSearched(false);
+    setSelectedSource(null);
     resetSearch();
     clearSearchPageCache();
   };
@@ -265,6 +235,8 @@ export default function SearchPage() {
               availableSources={availableSources}
               loading={loading}
               latencies={latencies}
+              selectedSource={selectedSource}
+              onSourceChange={setSelectedSource}
             />
           </div>
         )}
