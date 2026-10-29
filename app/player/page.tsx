@@ -445,7 +445,7 @@ function PlayerContent() {
   return (
     <div className="min-h-screen bg-[var(--bg-color)]">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-3">
-        {loading ? (
+        {loading && !videoData ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-[var(--accent-color)] border-t-transparent mb-4"></div>
             <p className="text-[var(--text-color-secondary)]">正在加载视频详情...</p>

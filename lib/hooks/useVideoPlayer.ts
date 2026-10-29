@@ -44,6 +44,13 @@ export function useVideoPlayer(
   const [playUrl, setPlayUrl] = useState('');
   const [videoError, setVideoError] = useState<string>('');
 
+  // 记录当前是否已有可播放的数据：切换源时保留旧画面，避免整页回到加载态
+  const hasPlayableDataRef = useRef(false);
+
+  useEffect(() => {
+    hasPlayableDataRef.current = videoData !== null && playUrl !== '';
+  }, [videoData, playUrl]);
+
   // Refs to keep track of latest values for the fetch function without re-triggering it
   // This solves the stale closure problem while keeping fetchVideoDetails stable for the player
   const episodeParamRef = useRef(episodeParam);
@@ -183,10 +190,13 @@ export function useVideoPlayer(
 
   useEffect(() => {
     if (videoId && source) {
-      // Reset state when source changes to ensure clean fetch
-      setVideoData(null);
-      setCurrentEpisode(0);
-      setPlayUrl('');
+      // 已有播放数据时属于切换源：保留当前视频与选集，
+      // 等新源详情返回后再整体替换，避免页面回到加载态
+      if (!hasPlayableDataRef.current) {
+        setVideoData(null);
+        setCurrentEpisode(0);
+        setPlayUrl('');
+      }
       fetchVideoDetails();
     }
   }, [videoId, source, fetchVideoDetails]);

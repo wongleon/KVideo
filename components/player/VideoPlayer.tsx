@@ -41,7 +41,8 @@ export function VideoPlayer({
   externalTimeRef,
   onResolutionDetected,
 }: VideoPlayerProps) {
-  const [videoError, setVideoError] = useState<string>('');
+  // 记录播放错误及其对应的视频地址：切换分集或源后地址变化，旧错误自动失效
+  const [errorState, setErrorState] = useState<{ message: string; playUrl: string } | null>(null);
   const [useProxy, setUseProxy] = useState(false);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
@@ -145,18 +146,18 @@ export function VideoPlayer({
     if (!effectiveUseProxy && proxyMode === 'retry') {
       setUseProxy(true);
       setShouldAutoPlay(true); // Force autoplay after proxy retry
-      setVideoError('');
+      setErrorState(null);
       return;
     }
 
-    setVideoError(error);
+    setErrorState({ message: error, playUrl });
   };
 
   const handleRetry = () => {
     if (retryCount >= MAX_MANUAL_RETRIES) return;
 
     setRetryCount(prev => prev + 1);
-    setVideoError('');
+    setErrorState(null);
     setShouldAutoPlay(true);
     // Toggle proxy to try different path, but since we are already in error state which likely means proxy failed (or direct failed),
     // we can try toggling or just force re-render.
@@ -170,6 +171,9 @@ export function VideoPlayer({
     // So simple toggle is fine.
     setUseProxy(prev => proxyMode === 'none' ? false : !prev);
   };
+
+  // 地址变化后，之前针对旧地址记录的播放错误自动失效
+  const videoError = errorState && errorState.playUrl === playUrl ? errorState.message : '';
 
   const finalPlayUrl = effectiveUseProxy
     ? `/api/proxy?url=${encodeURIComponent(playUrl)}&retry=${retryCount}` // Add retry param to force fresh request
@@ -202,7 +206,8 @@ export function VideoPlayer({
         />
       ) : (
         <CustomVideoPlayer
-          key={`${effectiveUseProxy ? 'proxy' : 'direct'}-${retryCount}-${source}`} // Remount when switching sources, modes, or retrying
+          // 代理模式或重试次数变化时重挂载；切换视频源保持播放器实例，只重新加载视频流
+          key={`${effectiveUseProxy ? 'proxy' : 'direct'}-${retryCount}`}
           src={finalPlayUrl}
           onError={handleVideoError}
           onTimeUpdate={handleTimeUpdate}
