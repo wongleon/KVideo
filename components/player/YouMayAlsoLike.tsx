@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MovieCard } from '@/components/home/MovieCard';
 import { clearSearchPageCache } from '@/lib/utils/search-page-cache';
@@ -20,7 +20,10 @@ interface YouMayAlsoLikeProps {
 
 export function YouMayAlsoLike({ title, typeName, actors, area }: YouMayAlsoLikeProps) {
   const router = useRouter();
-  const { movies, loading } = useSimilarRecommendations({ title, typeName, actors, area });
+  // 首次进入播放页时固定推荐参数：切换视频源会替换详情数据，
+  // 但「猜你喜欢」应保持稳定，避免重复请求与模块闪烁
+  const [initialParams] = useState(() => ({ title, typeName, actors, area }));
+  const { movies, loading } = useSimilarRecommendations(initialParams);
 
   const handleMovieClick = useCallback(
     (movie: SimilarMovie) => {
