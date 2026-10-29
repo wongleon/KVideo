@@ -129,7 +129,7 @@ const nextConfig: NextConfig = {
     ];
 
     return [
-      { source: '/apple-touch-icon.png', headers: staticAssetHeaders },
+      { source: '/ouch-icon.png', headers: staticAssetHeaders },
       { source: '/icon.png', headers: staticAssetHeaders },
       { source: '/logo.png', headers: staticAssetHeaders },
       {
