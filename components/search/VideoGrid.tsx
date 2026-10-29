@@ -5,7 +5,8 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { VideoCard } from './VideoCard';
 import { VideoGroupCard, GroupedVideo } from './VideoGroupCard';
 import { settingsStore } from '@/lib/store/settings-store';
-import { Video } from '@/lib/types';
+import { useHistory } from '@/lib/store/history-store';
+import { Video, VideoHistoryItem } from '@/lib/types';
 import { useResolutionProbe } from '@/lib/hooks/useResolutionProbe';
 
 interface VideoGridProps {
@@ -69,6 +70,19 @@ export const VideoGrid = memo(function VideoGrid({
     return () => unsubscribe();
   }, [pathname, searchParams, videos.length]);
 
+  // 观看历史：点击搜索结果时，若存在历史记录则直接按上次的进度与线路续播
+  const { viewingHistory } = useHistory(isPremium);
+
+  // 标题 → 最近一条历史记录（历史记录本身已按标题去重，数组按观看时间倒序）
+  const historyByTitle = useMemo(() => {
+    const map = new Map<string, VideoHistoryItem>();
+    for (const item of viewingHistory) {
+      const key = item.title.toLowerCase().trim();
+      if (!map.has(key)) map.set(key, item);
+    }
+    return map;
+  }, [viewingHistory]);
+
   // 分组模式：按「标题 + 年份」合并，年份缺失的条目单独成组
   const groupedVideos = useMemo<GroupedVideo[]>(() => {
     if (displayMode !== 'grouped') return [];
@@ -129,6 +143,15 @@ export const VideoGrid = memo(function VideoGrid({
         title: video.vod_name,
       };
 
+      // 同一视频源存在观看历史时，带上集数与播放进度续播
+      const historyItem = historyByTitle.get(video.vod_name.toLowerCase().trim());
+      if (historyItem && historyItem.source === video.source) {
+        params.episode = String(historyItem.episodeIndex);
+        if (historyItem.playbackPosition > 1) {
+          params.t = String(Math.floor(historyItem.playbackPosition));
+        }
+      }
+
       if (isPremium) {
         params.premium = '1';
       }
@@ -139,17 +162,42 @@ export const VideoGrid = memo(function VideoGrid({
 
       return { video, videoUrl, cardId };
     });
-  }, [videos, displayMode, isPremium]);
+  }, [videos, displayMode, isPremium, historyByTitle]);
 
   // Grouped mode items
   const groupItems = useMemo(() => {
     if (displayMode !== 'grouped') return [];
 
-    return groupedVideos.map((group, index) => ({
-      group,
-      cardId: `group-${group.representative.vod_id}-${index}`,
-    }));
-  }, [groupedVideos, displayMode]);
+    return groupedVideos.map((group, index) => {
+      const historyItem = historyByTitle.get(group.name.toLowerCase().trim());
+      // 默认使用组内代表线路，存在历史记录时优先沿用历史记录的线路
+      let playTarget = group.representative;
+      let resume: { episodeIndex: number; position: number } | undefined;
+
+      if (historyItem) {
+        const historyVideoId = historyItem.sourceMap?.[historyItem.source] ?? historyItem.videoId;
+        const matched =
+          group.videos.find(
+            (video) => video.source === historyItem.source && String(video.vod_id) === String(historyVideoId)
+          ) ?? group.videos.find((video) => video.source === historyItem.source);
+
+        if (matched) {
+          playTarget = matched;
+          resume = {
+            episodeIndex: historyItem.episodeIndex,
+            position: historyItem.playbackPosition,
+          };
+        }
+      }
+
+      return {
+        group,
+        cardId: `group-${group.representative.vod_id}-${index}`,
+        playTarget,
+        resume,
+      };
+    });
+  }, [groupedVideos, displayMode, historyByTitle]);
 
   // Build probe list for grouped mode (probe representative of each group)
   const groupedProbeList = useMemo(() => {
@@ -178,12 +226,14 @@ export const VideoGrid = memo(function VideoGrid({
       >
         {displayMode === 'grouped' ? (
           // Grouped mode
-          groupItems.slice(0, visibleCount).map(({ group, cardId }) => {
+          groupItems.slice(0, visibleCount).map(({ group, cardId, playTarget, resume }) => {
             return (
               <VideoGroupCard
                 key={cardId}
                 group={group}
                 cardId={cardId}
+                playTarget={playTarget}
+                resume={resume}
                 isPremium={isPremium}
                 latencies={latencies}
                 resolution={resolutions[`${group.representative.source}:${group.representative.vod_id}`]}

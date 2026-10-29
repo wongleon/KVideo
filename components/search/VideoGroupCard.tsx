@@ -31,6 +31,13 @@ export interface GroupedVideo {
 interface VideoGroupCardProps {
     group: GroupedVideo;
     cardId: string;
+    /** 点击后实际进入播放页的线路：有历史记录时为历史线路，否则为组内代表线路 */
+    playTarget?: Video;
+    /** 从搜索结果进入时的续播信息，包含集数与播放进度 */
+    resume?: {
+        episodeIndex: number;
+        position: number;
+    };
     isPremium?: boolean;
     latencies?: Record<string, number>;
     resolution?: ResolutionInfo | null;
@@ -40,6 +47,8 @@ interface VideoGroupCardProps {
 export const VideoGroupCard = memo<VideoGroupCardProps>(({
     group,
     cardId,
+    playTarget,
+    resume,
     isPremium = false,
     latencies = {},
     resolution,
@@ -55,11 +64,21 @@ export const VideoGroupCard = memo<VideoGroupCardProps>(({
 
     // Generate URL with grouped sources stored in sessionStorage (avoids long URLs / 414 errors)
     const videoUrl = useMemo(() => {
+        // 有历史记录时进入历史记录的线路，否则进入组内代表线路
+        const target = playTarget ?? representative;
         const params = new URLSearchParams({
-            id: String(representative.vod_id),
-            source: representative.source,
-            title: representative.vod_name,
+            id: String(target.vod_id),
+            source: target.source,
+            title: target.vod_name,
         });
+
+        // 带上历史记录的集数与进度，进入播放页后直接续播
+        if (resume) {
+            params.set('episode', String(resume.episodeIndex));
+            if (resume.position > 1) {
+                params.set('t', String(Math.floor(resume.position)));
+            }
+        }
 
         // Store group data in sessionStorage and pass short key in URL
         if (videos.length > 1) {
@@ -83,7 +102,7 @@ export const VideoGroupCard = memo<VideoGroupCardProps>(({
         }
 
         return `/player?${params.toString()}`;
-    }, [representative, videos, isPremium]);
+    }, [representative, videos, isPremium, playTarget, resume]);
 
     return (
         <div

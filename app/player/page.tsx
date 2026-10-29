@@ -391,6 +391,8 @@ function PlayerContent() {
     // Update URL to reflect current episode
     const params = new URLSearchParams(searchParams.toString());
     params.set('episode', index.toString());
+    // 切换分集后，上一集残留的播放进度不再适用
+    params.delete('t');
     router.replace(`/player?${params.toString()}`, { scroll: false });
   }, [searchParams, router, setCurrentEpisode, setPlayUrl, setVideoError]);
 
