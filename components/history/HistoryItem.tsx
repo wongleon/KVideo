@@ -3,6 +3,7 @@
  * Displays video thumbnail, title, episode, progress, and delete button
  */
 
+import Link from 'next/link';
 import Image from 'next/image';
 import { Icons } from '@/components/ui/Icon';
 import { formatTime } from '@/lib/utils/format-utils';
@@ -73,15 +74,6 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
     return `/player?${params.toString()}`;
   };
 
-  const handleClick = (event: React.MouseEvent) => {
-    // Middle mouse or Ctrl/Cmd+click opens in new tab
-    if (event.button === 1 || event.ctrlKey || event.metaKey) {
-      event.preventDefault();
-      window.open(getVideoUrl(), '_blank');
-      return;
-    }
-  };
-
   const progress = (item.playbackPosition / item.duration) * 100;
   const episodeText = item.episodes && item.episodes.length > 0
     ? item.episodes[item.episodeIndex]?.name || `第${item.episodeIndex + 1}集`
@@ -89,16 +81,10 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
 
   return (
     <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-lg overflow-hidden hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
-      <a
+      {/* 使用客户端导航：避免整页跳转丢失用户手势，进入播放页后可自动播放 */}
+      <Link
         href={getVideoUrl()}
-        onClick={(e) => {
-          e.preventDefault();
-          handleClick(e as any);
-          if (!e.ctrlKey && !e.metaKey) {
-            window.location.href = getVideoUrl();
-          }
-        }}
-        onAuxClick={(e) => handleClick(e as any)}
+        prefetch={false}
         className="block"
       >
         <div className="flex items-stretch gap-3">
@@ -150,7 +136,7 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
             </button>
           </div>
         </div>
-      </a>
+      </Link>
     </div>
   );
 }

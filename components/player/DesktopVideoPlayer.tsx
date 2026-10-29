@@ -349,6 +349,12 @@ export function DesktopVideoPlayer({
       logic.skipForward();
       handleMouseMove(); // Reset 3s auto-hide timer
     },
+    // 控件隐藏态下，双击中间区域切换播放/暂停
+    onDoubleTapCenter: () => {
+      if (!data.showControls) {
+        togglePlay();
+      }
+    },
     onSkipContinueLeft: () => {
       logic.skipBackward();
       handleMouseMove();

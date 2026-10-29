@@ -3,32 +3,76 @@
  * Matches HistoryItem layout for consistency
  */
 
+import Link from 'next/link';
 import { Icons } from '@/components/ui/Icon';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
 import { getSourceName } from '@/lib/utils/source-names';
 import { storeGroupedSources } from '@/lib/utils/grouped-sources-cache';
-import type { FavoriteItem } from '@/lib/types';
+import type { FavoriteItem, VideoHistoryItem } from '@/lib/types';
 
 interface FavoritesItemProps {
     item: FavoriteItem;
+    /** 同一部剧的观看历史，存在时共享其线路、集数与播放进度 */
+    historyItem?: VideoHistoryItem;
     onRemove: () => void;
     isPremium?: boolean;
 }
 
-export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesItemProps) {
-    const getVideoUrl = (): string => {
-        const params = new URLSearchParams({
-            id: item.videoId.toString(),
-            source: item.source,
-            title: item.title,
-        });
-        if (item.sourceMap && Object.keys(item.sourceMap).length > 1) {
-            const groupData = Object.entries(item.sourceMap).map(([sourceName, videoId]) => ({
-                id: videoId,
-                source: sourceName,
-                sourceName: getSourceName(sourceName),
+export function FavoritesItem({ item, historyItem, onRemove, isPremium = false }: FavoritesItemProps) {
+    // 有观看历史时沿用历史记录的线路
+    const playSource = historyItem?.source || item.source;
+    const playVideoId = historyItem
+        ? (historyItem.sourceMap?.[historyItem.source] ?? historyItem.videoId)
+        : item.videoId;
+
+    const getGroupedSources = () => {
+        // 优先使用播放页回写到历史记录的完整线路列表
+        if (historyItem?.sources && historyItem.sources.length > 0) {
+            const list = historyItem.sources.map((entry) => ({
+                id: entry.id,
+                source: entry.source,
+                sourceName: entry.sourceName || getSourceName(entry.source),
                 pic: item.poster,
             }));
+            // 确保当前播放线路在列表中，避免播放页再追加一条同源线路
+            if (!list.some((entry) => entry.source === playSource && String(entry.id) === String(playVideoId))) {
+                list.unshift({
+                    id: playVideoId,
+                    source: playSource,
+                    sourceName: getSourceName(playSource),
+                    pic: item.poster,
+                });
+            }
+            return list;
+        }
+
+        // 否则合并收藏与历史记录里已知的线路，历史记录的 id 优先
+        const sourceMap = { ...(item.sourceMap || {}), ...(historyItem?.sourceMap || {}) };
+        return Object.entries(sourceMap).map(([sourceName, videoId]) => ({
+            id: videoId,
+            source: sourceName,
+            sourceName: getSourceName(sourceName),
+            pic: item.poster,
+        }));
+    };
+
+    const getVideoUrl = (): string => {
+        const params = new URLSearchParams({
+            id: playVideoId.toString(),
+            source: playSource,
+            title: item.title,
+        });
+
+        // 有历史记录时带上集数与播放进度，进入播放页后直接续播
+        if (historyItem) {
+            params.set('episode', String(historyItem.episodeIndex));
+            if (historyItem.playbackPosition > 1) {
+                params.set('t', String(Math.floor(historyItem.playbackPosition)));
+            }
+        }
+
+        const groupData = getGroupedSources();
+        if (groupData.length > 1) {
             const cacheKey = storeGroupedSources(groupData);
             if (cacheKey) {
                 params.set('gs', cacheKey);
@@ -40,27 +84,18 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
         return `/player?${params.toString()}`;
     };
 
-    const handleClick = (event: React.MouseEvent) => {
-        // Middle mouse or Ctrl/Cmd+click opens in new tab
-        if (event.button === 1 || event.ctrlKey || event.metaKey) {
-            event.preventDefault();
-            window.open(getVideoUrl(), '_blank');
-            return;
-        }
-    };
+    // 集数：有历史记录时显示历史记录的观看集数，否则沿用收藏时记录的信息
+    const historyEpisodeText = historyItem
+        ? (historyItem.episodes?.[historyItem.episodeIndex]?.name || `第${historyItem.episodeIndex + 1}集`)
+        : '';
+    const episodeText = historyEpisodeText || item.remarks;
 
     return (
         <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-lg overflow-hidden hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
-            <a
+            {/* 使用客户端导航：避免整页跳转丢失用户手势，进入播放页后可自动播放 */}
+            <Link
                 href={getVideoUrl()}
-                onClick={(e) => {
-                    e.preventDefault();
-                    handleClick(e as any);
-                    if (!e.ctrlKey && !e.metaKey) {
-                        window.location.href = getVideoUrl();
-                    }
-                }}
-                onAuxClick={(e) => handleClick(e as any)}
+                prefetch={false}
                 className="block"
             >
                 <div className="flex items-stretch gap-3">
@@ -94,9 +129,9 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
                                 {item.year}
                             </p>
                         )}
-                        {item.remarks && (
+                        {episodeText && (
                             <div className="flex items-center text-xs text-[var(--text-color-secondary)]">
-                                <span className="truncate">{item.remarks}</span>
+                                <span className="truncate">{episodeText}</span>
                             </div>
                         )}
                     </div>
@@ -134,7 +169,7 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
                         </button>
                     </div>
                 </div>
-            </a>
+            </Link>
         </div>
     );
 }
