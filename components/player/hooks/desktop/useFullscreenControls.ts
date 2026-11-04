@@ -443,8 +443,11 @@ export function useFullscreenControls({
 
         document.body.style.overflow = 'hidden';
         document.body.style.overscrollBehavior = 'contain';
+        // 全屏期间给 html 挂标记类，由样式层把页面底色置黑，兜住 iOS 主屏 PWA 的安全区缝隙
+        document.documentElement.classList.add('kvideo-web-fullscreen-active');
 
         return () => {
+            document.documentElement.classList.remove('kvideo-web-fullscreen-active');
             document.body.style.overflow = previousOverflow;
             document.body.style.overscrollBehavior = previousOverscroll;
         };

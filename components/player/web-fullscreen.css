@@ -3,10 +3,11 @@
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
-    width: var(--kvideo-viewport-width, 100vw) !important;
-    height: var(--kvideo-viewport-height, 100vh) !important;
-    height: var(--kvideo-viewport-height, 100dvh) !important;
-    /* Fallback for browsers supporting dvh */
+    /* 用四边贴齐撑满视口，避免 iOS 主屏 PWA 下 JS 量取的 visualViewport 高度偏小导致底部留白 */
+    right: 0 !important;
+    bottom: 0 !important;
+    width: auto !important;
+    height: auto !important;
     z-index: 2147483647 !important;
     background: black !important;
     border-radius: 0 !important;
@@ -57,6 +58,16 @@
     height: var(--kvideo-viewport-width, 100vw) !important;
     top: 50% !important;
     left: 50% !important;
+    /* 旋转模式下由宽高决定尺寸，重置贴边值避免相互冲突 */
+    right: auto !important;
+    bottom: auto !important;
     transform: translate(-50%, -50%) rotate(90deg) !important;
     border-radius: 0 !important;
+}
+
+/* 兜底：网页全屏时把 html/body 底色也改为黑色，避免 iOS 主屏 PWA 底部安全区露出浅色背景 */
+html.kvideo-web-fullscreen-active,
+html.kvideo-web-fullscreen-active body {
+    background-color: #000 !important;
+    background-image: none !important;
 }
