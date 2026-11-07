@@ -443,12 +443,7 @@ function PlayerContent() {
   }
 
   return (
-    <div className="relative isolate min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
-      {/* 顶部背景与顶栏同源渐变，向下淡出到页面底色，避免顶部出现纯黑/纯白色带 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-[calc(-1*env(safe-area-inset-top))] -z-10 h-40 bg-gradient-to-b from-[var(--navbar-bg-from)] to-transparent"
-      />
+    <div className="min-h-screen bg-[var(--bg-color)]">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-3">
         {loading && !videoData ? (
           <div className="flex flex-col items-center justify-center py-20">

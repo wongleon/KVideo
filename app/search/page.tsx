@@ -133,12 +133,7 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="relative isolate min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
-      {/* 顶部背景与顶栏同源渐变，向下淡出到页面底色，避免顶部出现纯黑/纯白色带 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-[calc(-1*env(safe-area-inset-top))] -z-10 h-40 bg-gradient-to-b from-[var(--navbar-bg-from)] to-transparent"
-      />
+    <div className="min-h-screen bg-[var(--bg-color)]">
       {/* 顶部搜索栏：返回 + 输入框 + 搜索按钮 */}
       <header className="sticky top-[env(safe-area-inset-top)] z-[1100] px-3 sm:px-4 pt-3 pb-1">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto flex items-center gap-2">

@@ -72,12 +72,7 @@ export default function SettingsPage() {
   } = useSettingsPage();
 
   return (
-    <div className="relative isolate min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
-      {/* 顶部背景与顶栏同源渐变，向下淡出到页面底色，保证与其他页面的顶栏配色衔接 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-[calc(-1*env(safe-area-inset-top))] -z-10 h-40 bg-gradient-to-b from-[var(--navbar-bg-from)] to-transparent"
-      />
+    <div className="min-h-screen bg-[var(--bg-color)]">
       <div className="container mx-auto px-4 pt-8 pb-32 max-w-4xl space-y-8">
         {/* Account Settings */}
         <AccountSettings />
