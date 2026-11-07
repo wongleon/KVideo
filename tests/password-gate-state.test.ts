@@ -50,6 +50,18 @@ test('PasswordGate unlocks public deployments without auth state', () => {
   });
 });
 
+test('PasswordGate unlocks public deployments and clears stale local mirrors', () => {
+  assert.deepEqual(resolvePasswordGateState({
+    hasAuth: false,
+    serverSession: null,
+    mirroredSession: session,
+    persistSession: true,
+  }), {
+    action: 'unlock-public',
+    clearMirroredSession: true,
+  });
+});
+
 test('PasswordGate remains locked when auth is configured and no valid session exists', () => {
   assert.deepEqual(resolvePasswordGateState({
     hasAuth: true,

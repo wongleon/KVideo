@@ -8,6 +8,8 @@ export type PasswordGateStateResolution =
     }
   | {
       action: 'unlock-public';
+      /** 无鉴权部署下本地残留的旧会话无效，需要一并清理 */
+      clearMirroredSession?: boolean;
     }
   | {
       action: 'lock';
@@ -25,6 +27,13 @@ export function resolvePasswordGateState({
   mirroredSession: AuthSession | null;
   persistSession: boolean;
 }): PasswordGateStateResolution {
+  // 未启用鉴权时必须直接放行：否则本地残留的旧会话会把用户锁在无法解锁的密码页
+  if (!hasAuth) {
+    return mirroredSession
+      ? { action: 'unlock-public', clearMirroredSession: true }
+      : { action: 'unlock-public' };
+  }
+
   if (serverSession) {
     return {
       action: 'unlock-session',
@@ -38,10 +47,6 @@ export function resolvePasswordGateState({
       action: 'lock',
       clearMirroredSession: true,
     };
-  }
-
-  if (!hasAuth) {
-    return { action: 'unlock-public' };
   }
 
   return {

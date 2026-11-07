@@ -1,0 +1,64 @@
+﻿▲ Next.js 16.2.12 (webpack)
+
+  Creating an optimized production build ...
+node.exe : Browserslist: browsers data (caniuse-lite) is 9 months old. Please run:
+所在位置 行:1 字符: 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Browserslist: b...ld. Please run::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ Compiled successfully in 17.5s
+  Running TypeScript ...
+  Finished TypeScript in 17.5s ...
+  Collecting page data using 13 workers ...
+⚠ Using edge runtime on a page currently disables static generation for that page
+  Generating static pages using 13 workers (0/12) ...
+  Generating static pages using 13 workers (3/12) 
+  Generating static pages using 13 workers (6/12) 
+  Generating static pages using 13 workers (9/12) 
+✓ Generating static pages using 13 workers (12/12) in 1958ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/app-update
+├ ƒ /api/auth
+├ ƒ /api/auth/accounts
+├ ƒ /api/auth/accounts/[accountId]
+├ ƒ /api/auth/session
+├ ƒ /api/config
+├ ƒ /api/danmaku
+├ ƒ /api/detail
+├ ƒ /api/douban/image
+├ ƒ /api/douban/recommend
+├ ƒ /api/douban/tags
+├ ƒ /api/iptv
+├ ƒ /api/iptv/stream
+├ ƒ /api/ping
+├ ƒ /api/premium/category
+├ ƒ /api/premium/types
+├ ƒ /api/probe-resolution
+├ ƒ /api/proxy
+├ ƒ /api/search-parallel
+├ ƒ /api/user/config
+├ ƒ /api/user/sync
+├ ○ /favorites
+├ ○ /history
+├ ○ /iptv
+├ ○ /player
+├ ○ /premium
+├ ○ /premium/favorites
+├ ○ /premium/settings
+├ ○ /search
+└ ○ /settings
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+EXIT=0

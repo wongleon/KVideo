@@ -19,6 +19,7 @@ import { RuntimeFeaturesProvider } from "@/components/RuntimeFeaturesProvider";
 import { VideoTogetherController } from '@/components/VideoTogetherController';
 import { shouldEnableVercelAnalytics } from '@/lib/config/deployment';
 import { getRuntimeFeatures } from "@/lib/server/runtime-features";
+import { getRuntimeEnvValue } from "@/lib/server/runtime-env";
 import { resolveAppleTouchIconSrc, resolveSiteIconSrc } from '@/lib/server/site-icon';
 import fs from 'fs';
 import path from 'path';
@@ -87,6 +88,18 @@ export default async function RootLayout({
 }>) {
   const siteIconSrc = await resolveSiteIconSrc();
   const runtimeFeatures = getRuntimeFeatures();
+  // 服务端判定是否需要鉴权：无需鉴权时首屏直接渲染页面内容，避免整页白屏。
+  // 使用 getRuntimeEnvValue 与 /api/auth 的读取方式保持一致（Cloudflare 下变量在请求上下文中）。
+  const hasAuth = !!(
+    getRuntimeEnvValue('ADMIN_PASSWORD') ||
+    getRuntimeEnvValue('ACCESS_PASSWORD') ||
+    getRuntimeEnvValue('ACCOUNTS') ||
+    (
+      getRuntimeEnvValue('AUTH_SECRET') &&
+      getRuntimeEnvValue('UPSTASH_REDIS_REST_URL') &&
+      getRuntimeEnvValue('UPSTASH_REDIS_REST_TOKEN')
+    )
+  );
   const videoTogetherScriptUrl =
     process.env.VIDEOTOGETHER_SCRIPT_URL?.trim() || DEFAULT_VIDEOTOGETHER_SCRIPT_URL;
   const videoTogetherSettingUrl = process.env.VIDEOTOGETHER_SETTING_URL?.trim();
@@ -125,22 +138,17 @@ export default async function RootLayout({
 
               <TVProvider>
                 <TVNavigationInitializer />
-                <PasswordGate hasAuth={!!(
-                  process.env.ADMIN_PASSWORD ||
-                  process.env.ACCOUNTS ||
-                  process.env.ACCESS_PASSWORD ||
-                  (
-                    process.env.AUTH_SECRET &&
-                    process.env.UPSTASH_REDIS_REST_URL &&
-                    process.env.UPSTASH_REDIS_REST_TOKEN
-                  )
-                )}>
+                <PasswordGate hasAuth={hasAuth}>
                   <AutoSync />
                   <AdKeywordsWrapper />
                   {children}
                   <BottomNav />
                   <BackToTop />
-                  <ScrollPositionManager />
+                  {/* ScrollPositionManager 使用 useSearchParams，需置于 Suspense 内，
+                      否则静态预渲染时会触发 CSR bailout 报错 */}
+                  <React.Suspense fallback={null}>
+                    <ScrollPositionManager />
+                  </React.Suspense>
                 </PasswordGate>
               </TVProvider>
               {vercelAnalyticsEnabled ? <Analytics /> : null}

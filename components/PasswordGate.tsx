@@ -85,6 +85,45 @@ function applyRuntimeConfig(data: {
   }
 }
 
+/** 需要鉴权时的首屏骨架屏：占住顶栏与内容布局，避免校验期间整页空白 */
+function PageLoadingSkeleton() {
+  const tabWidths = [56, 72, 88, 72, 72, 88];
+
+  return (
+    <div className="min-h-[100dvh] animate-pulse" aria-hidden>
+      {/* 顶栏占位 */}
+      <div className="pt-2 pb-2">
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="h-10 rounded-[var(--radius-lg)] bg-[var(--glass-bg)]" />
+        </div>
+        {/* 分类标签占位 */}
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
+          {tabWidths.map((width, index) => (
+            <div
+              key={index}
+              className="h-9 flex-shrink-0 rounded-[var(--radius-full)] bg-[var(--glass-bg)]"
+              style={{ width }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* 内容区占位：轮播图 + 影片网格 */}
+      <div className="mx-auto max-w-7xl space-y-6 px-4 pb-32 pt-2">
+        <div className="h-40 rounded-[var(--radius-2xl)] bg-[var(--glass-bg)] md:h-56" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4 lg:grid-cols-6">
+          {Array.from({ length: 12 }).map((_, index) => (
+            <div
+              key={index}
+              className="aspect-[2/3] rounded-[var(--radius-lg)] bg-[var(--glass-bg)]"
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function toAuthSession(session: {
   accountId: string;
   profileId: string;
@@ -114,7 +153,8 @@ export function PasswordGate({
 }) {
   useSubscriptionSync();
 
-  const [isLocked, setIsLocked] = useState(true);
+  // 无需鉴权时首帧即为已解锁状态，避免服务端渲染与客户端首帧不一致
+  const [isLocked, setIsLocked] = useState(initialHasAuth);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -166,6 +206,10 @@ export function PasswordGate({
         }
 
         if (gateState.action === 'unlock-public') {
+          // 无鉴权部署下清理失效的本地会话镜像，避免后续被误判为已锁定
+          if (gateState.clearMirroredSession) {
+            clearSession();
+          }
           setIsLocked(false);
           setIsClient(true);
           return;
@@ -231,7 +275,11 @@ export function PasswordGate({
     setTimeout(() => form?.classList.remove('animate-shake'), 500);
   };
 
-  if (!isClient) return null;
+  // 服务端渲染阶段：无需鉴权时直接输出真实内容，避免首屏整页白屏；
+  // 需要鉴权时先输出骨架屏占位，客户端校验完成后再决定解锁还是显示密码页。
+  if (!isClient) {
+    return initialHasAuth ? <PageLoadingSkeleton /> : <>{children}</>;
+  }
 
   if (!isLocked) {
     return <>{children}</>;
