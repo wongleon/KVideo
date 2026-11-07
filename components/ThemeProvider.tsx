@@ -40,10 +40,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       // 让浏览器/系统状态栏的文字颜色跟随主题
       document.documentElement.style.colorScheme = themeToApply;
 
-      // 同步状态栏 / 浏览器主题色（iOS 主屏 PWA 会用它绘制状态栏背景）
+      // 同步状态栏 / 浏览器主题色：取顶栏渐变起点色，避免状态栏出现纯黑或纯白的色带
       const themeColorMeta = document.querySelector('meta[name="theme-color"]');
       if (themeColorMeta) {
-        themeColorMeta.setAttribute('content', themeToApply === 'dark' ? '#121212' : '#f2f4f7');
+        const cssThemeColor = getComputedStyle(document.documentElement)
+          .getPropertyValue('--theme-color')
+          .trim();
+        themeColorMeta.setAttribute(
+          'content',
+          cssThemeColor || (themeToApply === 'dark' ? '#1e2328' : '#cbdbec')
+        );
       }
 
       // iOS 主屏 Web App 的状态栏由 WebKit 单独合成，切换根元素背景后不会立即重绘，
@@ -55,10 +61,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
       if (isStandalone) {
         const root = document.documentElement;
-        // 读取切换后生效的背景变量，避免与 variables.css 中的色值重复维护
+        // 读取切换后生效的主题色变量，与顶栏渐变起点保持一致
         const themedBackground = window
           .getComputedStyle(root)
-          .getPropertyValue('--bg-color')
+          .getPropertyValue('--theme-color')
           .trim();
         if (themedBackground) {
           root.style.backgroundColor = themedBackground;

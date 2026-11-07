@@ -139,7 +139,7 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-title" content="小视界" />
         {/* apple-touch-icon 由 generateMetadata 输出，固定 180x180 静态 PNG */}
         {/* Theme Color (for browser address bar) */}
-        <meta name="theme-color" content="#f2f4f7" />
+        <meta name="theme-color" content="#cbdbec" />
         <meta name="color-scheme" content="light dark" />
         {/* Mobile viewport */}
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
