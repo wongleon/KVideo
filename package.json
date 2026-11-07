@@ -7,6 +7,7 @@
     "build": "next build --webpack && node scripts/transpile-client-assets.mjs .next/static",
     "start": "node scripts/next-with-lan-access.mjs start",
     "lint": "eslint",
+    "splash": "tsx scripts/generate-apple-splash.ts",
     "test": "tsx --test tests/**/*.test.ts",
     "pages:build": "next-on-pages && node scripts/transpile-client-assets.mjs .vercel/output/static/_next/static"
   },

@@ -20,6 +20,12 @@ import { VideoTogetherController } from '@/components/VideoTogetherController';
 import { shouldEnableVercelAnalytics } from '@/lib/config/deployment';
 import { getRuntimeFeatures } from "@/lib/server/runtime-features";
 import { getRuntimeEnvValue } from "@/lib/server/runtime-env";
+import {
+  APPLE_SPLASH_MODES,
+  APPLE_SPLASH_SCREENS,
+  getAppleSplashImagePath,
+  getAppleSplashMedia,
+} from "@/lib/config/apple-splash";
 import { resolveAppleTouchIconSrc, resolveSiteIconSrc } from '@/lib/server/site-icon';
 import fs from 'fs';
 import path from 'path';
@@ -111,6 +117,20 @@ export default async function RootLayout({
       <head>
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
+        {/* iOS 主屏启动图：渐变背景 + 站点图标，按系统深浅色选择对应的图。
+            浅色那张不带 prefers-color-scheme，作为所有系统的兜底；深色那张追加该查询覆盖它。 */}
+        {APPLE_SPLASH_SCREENS.map((screen) => (
+          <React.Fragment key={`${screen.orientation}-${screen.width}x${screen.height}@${screen.ratio}`}>
+            {APPLE_SPLASH_MODES.map((mode) => (
+              <link
+                key={mode}
+                rel="apple-touch-startup-image"
+                href={getAppleSplashImagePath(screen, mode)}
+                media={getAppleSplashMedia(screen, mode)}
+              />
+            ))}
+          </React.Fragment>
+        ))}
         {/* Apple PWA Support */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

@@ -32,7 +32,7 @@ function HomePage() {
         {/* 吸顶背景层：向上延伸覆盖状态栏安全区，向下铺满整个头部 */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(-1*env(safe-area-inset-top))] bg-gradient-to-b from-[color-mix(in_srgb,var(--accent-color)_16%,var(--bg-color))] to-[var(--bg-color)]"
+          className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(-1*env(safe-area-inset-top))] bg-gradient-to-b from-[var(--navbar-bg-from)] to-[var(--navbar-bg-to)]"
         />
         <Navbar onReset={handleReset} embedded />
         <div className="relative max-w-7xl mx-auto px-4">

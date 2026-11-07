@@ -53,7 +53,7 @@ export function Navbar({ onReset, isPremiumMode = false, embedded = false }: Nav
             {!embedded && (
                 <div
                     aria-hidden
-                    className="pointer-events-none absolute inset-x-0 -bottom-2 top-[calc(-1*env(safe-area-inset-top))] bg-gradient-to-b from-[color-mix(in_srgb,var(--accent-color)_16%,var(--bg-color))] to-[var(--bg-color)]"
+                    className="pointer-events-none absolute inset-x-0 -bottom-2 top-[calc(-1*env(safe-area-inset-top))] bg-gradient-to-b from-[var(--navbar-bg-from)] to-[var(--navbar-bg-to)]"
                 />
             )}
             <div className="relative max-w-7xl mx-auto px-4">

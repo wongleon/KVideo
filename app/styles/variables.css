@@ -29,6 +29,10 @@
     --shadow-md: 0 4px 6px var(--shadow-color);
     --transition-fluid: 0.3s ease;
 
+    /* 顶栏吸顶背景渐变：起止色跟随主题，保证与页面背景自然衔接 */
+    --navbar-bg-from: color-mix(in srgb, var(--accent-color) 16%, var(--bg-color));
+    --navbar-bg-to: var(--bg-color);
+
     /* Active Theme Variables */
     --bg-color: var(--bg-color-light);
     --bg-image: var(--bg-image-light);
@@ -59,6 +63,10 @@ html.dark {
     --glass-bg: var(--glass-bg-dark);
     --glass-border: var(--glass-border-dark);
     --shadow-color: var(--shadow-color-dark);
+
+    /* 深色下页面背景是灰色渐变，顶栏只掺入极少量强调色，避免出现突兀的蓝色色块 */
+    --navbar-bg-from: color-mix(in srgb, var(--accent-color) 6%, #1e1e1e);
+    --navbar-bg-to: #191919;
 }
 
 body {
@@ -93,6 +101,9 @@ body.dark,
     --glass-bg: var(--glass-bg-dark);
     --glass-border: var(--glass-border-dark);
     --shadow-color: var(--shadow-color-dark);
+
+    --navbar-bg-from: color-mix(in srgb, var(--accent-color) 6%, #1e1e1e);
+    --navbar-bg-to: #191919;
 
     --background: #121212;
     --foreground: #f5f5f7;
