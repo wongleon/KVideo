@@ -45,6 +45,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (themeColorMeta) {
         themeColorMeta.setAttribute('content', themeToApply === 'dark' ? '#121212' : '#f2f4f7');
       }
+
+      // iOS 主屏 Web App 的状态栏由 WebKit 单独合成，切换根元素背景后不会立即重绘，
+      // 表现为「要切换页面或滚动一下状态栏才变色」。
+      // 这里直接给根元素写内联背景，并做一次 1px 的微滚动，强制重建该区域。
+      const isStandalone =
+        (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+        window.matchMedia('(display-mode: standalone)').matches;
+
+      if (isStandalone) {
+        const root = document.documentElement;
+        // 读取切换后生效的背景变量，避免与 variables.css 中的色值重复维护
+        const themedBackground = window
+          .getComputedStyle(root)
+          .getPropertyValue('--bg-color')
+          .trim();
+        if (themedBackground) {
+          root.style.backgroundColor = themedBackground;
+        }
+
+        const scrollY = window.scrollY;
+        window.scrollTo(0, scrollY + 1);
+        window.requestAnimationFrame(() => {
+          window.scrollTo(0, scrollY);
+        });
+      }
     };
 
     const applyThemeWithTransition = () => {

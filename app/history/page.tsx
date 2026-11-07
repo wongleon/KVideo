@@ -94,7 +94,12 @@ export default function HistoryPage() {
       : '确定要取消收藏这个视频吗？';
 
   return (
-    <div className="min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
+    <div className="relative isolate min-h-screen bg-[var(--bg-color)] bg-[image:var(--bg-image)] bg-fixed">
+      {/* 顶部背景与顶栏同源渐变，向下淡出到页面底色，保证与其他页面的顶栏配色衔接 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-[calc(-1*env(safe-area-inset-top))] -z-10 h-40 bg-gradient-to-b from-[var(--navbar-bg-from)] to-transparent"
+      />
       <main className="max-w-3xl mx-auto px-4 pt-8 pb-32">
         <header className="flex items-center justify-between gap-4 mb-6">
           {/* 左上角按钮 + 列表选择器 */}

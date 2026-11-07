@@ -117,8 +117,10 @@ export default async function RootLayout({
       <head>
         {/* PWA Manifest */}
         <link rel="manifest" href="/manifest.json" />
-        {/* iOS 主屏启动图：渐变背景 + 站点图标，按系统深浅色选择对应的图。
-            浅色那张不带 prefers-color-scheme，作为所有系统的兜底；深色那张追加该查询覆盖它。 */}
+        {/* iOS 主屏启动图：渐变背景 + 站点图标。
+            iOS 的 WebClip 启动图在「添加到主屏幕」时抓取并缓存，且不解析
+            prefers-color-scheme，因此深色那张（不带查询条件）才是实际命中的兜底；
+            浅色那张追加配色查询，仅对未来可能支持该特性的平台生效。 */}
         {APPLE_SPLASH_SCREENS.map((screen) => (
           <React.Fragment key={`${screen.orientation}-${screen.width}x${screen.height}@${screen.ratio}`}>
             {APPLE_SPLASH_MODES.map((mode) => (

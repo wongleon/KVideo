@@ -9,8 +9,12 @@
 
 export type AppleSplashMode = 'light' | 'dark';
 
-/** 生成与注入时遍历的模式顺序：浅色作为基础回退，深色按系统偏好覆盖 */
-export const APPLE_SPLASH_MODES: AppleSplashMode[] = ['light', 'dark'];
+/**
+ * 生成与注入时遍历的模式顺序。
+ * 深色排在最前：iOS 的 WebClip 启动图在安装时选定并缓存，且不解析
+ * `prefers-color-scheme`，只有不带该条件的「深色」会真正命中。
+ */
+export const APPLE_SPLASH_MODES: AppleSplashMode[] = ['dark', 'light'];
 
 /** 启动图中央的品牌文字 */
 export const APPLE_SPLASH_BRAND_TEXT = '小视界';
@@ -105,9 +109,10 @@ export function getAppleSplashImagePath(screen: AppleSplashScreen, mode: AppleSp
 /**
  * iOS 匹配启动图所需的媒体查询。
  *
- * 浅色不附加 `prefers-color-scheme`，作为所有设备的兜底；
- * 深色额外附加该查询，系统为深色时命中并覆盖前一条。
- * 这样即使某些系统版本忽略配色查询，也至少能命中浅色那张。
+ * 深色不附加 `prefers-color-scheme`：iOS 的 WebClip 启动图是在「添加到主屏幕」
+ * 时抓取并缓存的，既不解析配色查询、也不会在系统切换深浅色后重新挑选，
+ * 因此这条无条件的链接是唯一实际生效的兜底。
+ * 浅色额外附加 `(prefers-color-scheme: light)`，仅对未来可能支持该特性的平台生效。
  */
 export function getAppleSplashMedia(screen: AppleSplashScreen, mode: AppleSplashMode): string {
   const conditions = [
@@ -118,8 +123,8 @@ export function getAppleSplashMedia(screen: AppleSplashScreen, mode: AppleSplash
     `(orientation: ${screen.orientation})`,
   ];
 
-  if (mode === 'dark') {
-    conditions.push('(prefers-color-scheme: dark)');
+  if (mode === 'light') {
+    conditions.push('(prefers-color-scheme: light)');
   }
 
   return conditions.join(' and ');
