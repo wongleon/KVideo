@@ -1,12 +1,19 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 /**
  * 底部悬浮导航栏
  * 苹果风格毛玻璃悬浮底栏，在发现、追剧、设置页面显示（移动端与桌面端一致）
+ * 选中项由一块随点击滑动的透明玻璃高亮承载，图标轻微放大，文字常显
  */
+
+/** 单个导航项的固定宽度，滑动高亮按此宽度计算位移 */
+const ITEM_WIDTH = 76;
+/** 单个导航项的固定高度 */
+const ITEM_HEIGHT = 54;
 
 interface NavIconProps {
     size?: number;
@@ -65,6 +72,14 @@ function normalizePath(pathname: string | null): string {
 
 export function BottomNav() {
     const currentPath = normalizePath(usePathname());
+    const activeIndex = NAV_ITEMS.findIndex((item) => item.href === currentPath);
+    // 首帧禁用过渡，避免滑动高亮从第一个位置“飞”到当前页
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        const raf = requestAnimationFrame(() => setMounted(true));
+        return () => cancelAnimationFrame(raf);
+    }, []);
 
     // 仅在导航栏包含的页面中展示
     if (!VISIBLE_PATHS.includes(currentPath)) {
@@ -77,9 +92,24 @@ export function BottomNav() {
             className="fixed inset-x-0 bottom-0 z-[1500] flex justify-center px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none"
         >
             <div
-                className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-[28px] border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_20%,transparent)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_var(--shadow-color)]"
+                className="pointer-events-auto relative flex items-center p-1.5 rounded-[28px] border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_20%,transparent)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_var(--shadow-color)]"
                 style={{ transform: 'translate3d(0, 0, 0)' }}
             >
+                {/* 透明玻璃滑动高亮：椭圆胶囊，只做位移，不引入强调色 */}
+                <div
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute left-1.5 top-1.5 rounded-full border border-[rgba(255,255,255,0.28)] bg-[color-mix(in_srgb,var(--text-color)_8%,transparent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(0,0,0,0.04)] ${
+                        mounted
+                            ? 'transition-transform duration-[420ms] ease-[cubic-bezier(0.34,1.35,0.64,1)] motion-reduce:transition-none'
+                            : ''
+                    }`}
+                    style={{
+                        width: ITEM_WIDTH,
+                        height: ITEM_HEIGHT,
+                        transform: `translate3d(${activeIndex * ITEM_WIDTH}px, 0, 0)`,
+                    }}
+                />
+
                 {NAV_ITEMS.map(({ href, label, Icon }) => {
                     const isActive = currentPath === href;
 
@@ -87,16 +117,28 @@ export function BottomNav() {
                         <Link
                             key={href}
                             href={href}
+                            aria-label={label}
                             aria-current={isActive ? 'page' : undefined}
                             data-focusable
-                            className={`flex flex-col items-center justify-center gap-0.5 min-w-[72px] px-4 py-1.5 rounded-[22px] transition-all duration-200 cursor-pointer ${
+                            className={`relative z-10 flex flex-col items-center justify-center rounded-[22px] cursor-pointer transition-colors duration-300 ${
                                 isActive
-                                    ? 'bg-[color-mix(in_srgb,var(--accent-color)_14%,transparent)] text-[var(--accent-color)]'
-                                    : 'text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--text-color)_8%,transparent)]'
+                                    ? 'text-[var(--accent-color)]'
+                                    : 'text-[var(--text-color)] hover:text-[var(--accent-color)]'
                             }`}
+                            style={{ width: ITEM_WIDTH, height: ITEM_HEIGHT }}
                         >
-                            <Icon size={22} />
-                            <span className={`text-[11px] leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                            <span
+                                className={`transition-transform duration-[380ms] ease-[cubic-bezier(0.34,1.5,0.64,1)] motion-reduce:transition-none ${
+                                    isActive ? 'scale-110' : 'scale-100'
+                                }`}
+                            >
+                                <Icon size={22} />
+                            </span>
+                            <span
+                                className={`mt-[3px] text-[10px] leading-none tracking-wide transition-[font-weight,opacity] duration-300 motion-reduce:transition-none ${
+                                    isActive ? 'font-semibold' : 'font-medium opacity-75'
+                                }`}
+                            >
                                 {label}
                             </span>
                         </Link>
