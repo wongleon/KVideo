@@ -1,6 +1,6 @@
 /**
  * PopularFeatures - 首页豆瓣推荐区
- * 固定筛选：推荐（电影+剧集混合）、热门电影、热门剧集、热门综艺、热门美剧
+ * 固定筛选：推荐（电影+剧集混合）、热门电影、最新电影、热门剧集、热门综艺、热门美剧
  */
 
 'use client';
@@ -30,7 +30,7 @@ interface HomeFilter {
 }
 
 /** 首页固定筛选配置 */
-const HOME_FILTERS: HomeFilter[] = [
+export const HOME_FILTERS: HomeFilter[] = [
   {
     id: 'recommend',
     label: '推荐',
@@ -40,6 +40,7 @@ const HOME_FILTERS: HomeFilter[] = [
     ],
   },
   { id: 'movie', label: '热门电影', queries: [{ type: 'movie', tag: '热门' }] },
+  { id: 'new-movie', label: '最新电影', queries: [{ type: 'movie', tag: '最新' }] },
   { id: 'tv', label: '热门剧集', queries: [{ type: 'tv', tag: '热门' }] },
   { id: 'variety', label: '热门综艺', queries: [{ type: 'tv', tag: '综艺' }] },
   { id: 'us-tv', label: '热门美剧', queries: [{ type: 'tv', tag: '美剧' }] },
@@ -47,8 +48,10 @@ const HOME_FILTERS: HomeFilter[] = [
 
 const PAGE_LIMIT = 20;
 
-/** 轮播图取图来源：热门电影、热门剧集、热门综艺、热门美剧各取一张 */
-const CAROUSEL_FILTERS = HOME_FILTERS.filter((filter) => filter.id !== 'recommend');
+/** 轮播图取图来源：热门电影、热门剧集、热门综艺、热门美剧各取一张（推荐与最新电影不参与） */
+const CAROUSEL_FILTERS = HOME_FILTERS.filter(
+  (filter) => filter.id !== 'recommend' && filter.id !== 'new-movie'
+);
 
 /** 拉取一页豆瓣数据，多路查询交错合并并去重 */
 async function fetchDoubanPage(queries: DoubanQuery[], pageNumber: number): Promise<DoubanMovie[]> {
@@ -85,73 +88,13 @@ async function fetchDoubanPage(queries: DoubanQuery[], pageNumber: number): Prom
   return merged;
 }
 
-interface DoubanFeedProps {
-  queries: DoubanQuery[];
-  onMovieClick: (movie: DoubanMovie) => void;
+interface HomeFilterTabsProps {
+  selectedFilterId: string;
+  onSelect: (id: string) => void;
 }
 
-function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
-  const [movies, setMovies] = useState<DoubanMovie[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    fetchDoubanPage(queries, 0).then((list) => {
-      if (cancelled) return;
-      setMovies(list);
-      setHasMore(list.length > 0);
-      setLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [queries]);
-
-  const loadMore = useCallback(async (nextPage: number) => {
-    setLoading(true);
-    const list = await fetchDoubanPage(queries, nextPage);
-
-    setMovies((prev) => {
-      const seen = new Set(prev.map((movie) => movie.id));
-      return [...prev, ...list.filter((movie) => !seen.has(movie.id))];
-    });
-    setPage(nextPage);
-    setHasMore(list.length > 0);
-    setLoading(false);
-  }, [queries]);
-
-  const { prefetchRef, loadMoreRef } = useInfiniteScroll({
-    hasMore,
-    loading,
-    page,
-    onLoadMore: loadMore,
-  });
-
-  return (
-    <MovieGrid
-      movies={movies}
-      loading={loading}
-      hasMore={hasMore}
-      onMovieClick={onMovieClick}
-      prefetchRef={prefetchRef}
-      loadMoreRef={loadMoreRef}
-    />
-  );
-}
-
-interface PopularFeaturesProps {
-  onSearch?: (query: string) => void;
-}
-
-export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
-  const [selectedFilterId, setSelectedFilterId] = useState(HOME_FILTERS[0].id);
-  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张
-  const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>([]);
-
+/** 首页分类标签栏：与顶栏同处一个吸顶容器，避免两条独立吸顶栏在滚动时相互错位 */
+export function HomeFilterTabs({ selectedFilterId, onSelect }: HomeFilterTabsProps) {
   // 标签栏横向滑动（滚轮 + 鼠标拖动）
   const tagScrollRef = useRef<HTMLDivElement>(null);
   const tagDragRef = useRef({ isDown: false, moved: false, startX: 0, startScrollLeft: 0 });
@@ -214,6 +157,107 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
     tagDragRef.current.moved = false;
   };
 
+  return (
+    <div
+      ref={tagScrollRef}
+      onMouseDown={handleTagMouseDown}
+      onMouseMove={handleTagMouseMove}
+      onMouseUp={endTagDrag}
+      onMouseLeave={endTagDrag}
+      onClickCapture={handleTagClickCapture}
+      className="flex h-14 items-center gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-2 pt-2 -mx-4 px-4 scrollbar-hide select-none cursor-grab active:cursor-grabbing"
+    >
+      {HOME_FILTERS.map((filter) => {
+        const isSelected = filter.id === selectedFilterId;
+
+        return (
+          <button
+            key={filter.id}
+            type="button"
+            onClick={() => onSelect(filter.id)}
+            aria-pressed={isSelected}
+            data-focusable
+            className={`flex-shrink-0 px-6 py-2.5 text-sm font-semibold whitespace-nowrap rounded-[var(--radius-full)] transition-colors cursor-pointer select-none ${
+              isSelected
+                ? 'bg-[var(--accent-color)] text-white shadow-md'
+                : 'bg-[var(--glass-bg)] text-[var(--text-color)] ring-1 ring-inset ring-[var(--glass-border)] hover:ring-[var(--accent-color)]'
+            }`}
+          >
+            {filter.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+interface DoubanFeedProps {
+  queries: DoubanQuery[];
+  onMovieClick: (movie: DoubanMovie) => void;
+}
+
+function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
+  const [movies, setMovies] = useState<DoubanMovie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchDoubanPage(queries, 0).then((list) => {
+      if (cancelled) return;
+      setMovies(list);
+      setHasMore(list.length > 0);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queries]);
+
+  const loadMore = useCallback(async (nextPage: number) => {
+    setLoading(true);
+    const list = await fetchDoubanPage(queries, nextPage);
+
+    setMovies((prev) => {
+      const seen = new Set(prev.map((movie) => movie.id));
+      return [...prev, ...list.filter((movie) => !seen.has(movie.id))];
+    });
+    setPage(nextPage);
+    setHasMore(list.length > 0);
+    setLoading(false);
+  }, [queries]);
+
+  const { prefetchRef, loadMoreRef } = useInfiniteScroll({
+    hasMore,
+    loading,
+    page,
+    onLoadMore: loadMore,
+  });
+
+  return (
+    <MovieGrid
+      movies={movies}
+      loading={loading}
+      hasMore={hasMore}
+      onMovieClick={onMovieClick}
+      prefetchRef={prefetchRef}
+      loadMoreRef={loadMoreRef}
+    />
+  );
+}
+
+interface PopularFeaturesProps {
+  onSearch?: (query: string) => void;
+  selectedFilterId: string;
+}
+
+export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesProps) {
+  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张
+  const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>([]);
+
   const activeFilter = useMemo(
     () => HOME_FILTERS.find((filter) => filter.id === selectedFilterId) ?? HOME_FILTERS[0],
     [selectedFilterId]
@@ -256,40 +300,6 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
       {carouselMovies.length > 0 && (
         <RecommendCarousel movies={carouselMovies} onMovieClick={handleMovieClick} />
       )}
-
-      {/* 固定筛选标签：支持滚轮与鼠标拖动横向滑动 */}
-      <div
-        ref={tagScrollRef}
-        onMouseDown={handleTagMouseDown}
-        onMouseMove={handleTagMouseMove}
-        onMouseUp={endTagDrag}
-        onMouseLeave={endTagDrag}
-        onClickCapture={handleTagClickCapture}
-        className="sticky z-30 top-[calc(env(safe-area-inset-top)+4rem)] sm:top-[calc(env(safe-area-inset-top)+5.5rem)] mb-2 flex items-center gap-3 overflow-x-auto pb-2 pt-2 -mx-4 px-4 scrollbar-hide select-none cursor-grab active:cursor-grabbing"
-      >
-        {HOME_FILTERS.map((filter) => {
-          const isSelected = filter.id === activeFilter.id;
-
-          return (
-            <button
-              key={filter.id}
-              type="button"
-              onClick={() => {
-                setSelectedFilterId(filter.id);
-              }}
-              aria-pressed={isSelected}
-              data-focusable
-              className={`px-6 py-2.5 text-sm font-semibold whitespace-nowrap rounded-[var(--radius-full)] transition-all cursor-pointer select-none ${
-                isSelected
-                  ? 'bg-[var(--accent-color)] text-white shadow-md scale-105'
-                  : 'bg-[var(--glass-bg)] backdrop-blur-xl text-[var(--text-color)] border border-[var(--glass-border)] hover:border-[var(--accent-color)] hover:scale-105'
-              }`}
-            >
-              {filter.label}
-            </button>
-          );
-        })}
-      </div>
 
       <DoubanFeed
         key={activeFilter.id}

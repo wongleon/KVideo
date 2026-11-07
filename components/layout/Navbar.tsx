@@ -15,9 +15,11 @@ import { LogOut } from 'lucide-react';
 interface NavbarProps {
     onReset: () => void;
     isPremiumMode?: boolean;
+    /** 作为外层吸顶容器的一部分渲染时，自身不再吸顶、不再绘制背景 */
+    embedded?: boolean;
 }
 
-export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
+export function Navbar({ onReset, isPremiumMode = false, embedded = false }: NavbarProps) {
     const [session] = useState<AuthSession | null>(() => getSession());
     const { iptvEnabled } = useRuntimeFeatures();
     const siteIconSrc = useSiteIcon();
@@ -34,14 +36,28 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
     };
 
     return (
-        <nav className="sticky top-[env(safe-area-inset-top)] z-[2000] pt-2 pb-2" style={{
-            transform: 'translate3d(0, 0, 0)',
-            willChange: 'transform'
-        }}>
-            <div className="max-w-7xl mx-auto px-4">
-                <div className="py-2 sm:py-4" style={{
-                    transform: 'translate3d(0, 0, 0)'
-                }}>
+        <nav
+            className={
+                embedded
+                    ? 'relative'
+                    : 'relative sticky top-[env(safe-area-inset-top)] z-[2000] pt-2 pb-2'
+            }
+            style={
+                // 嵌入吸顶容器时去掉全局 nav 规则带来的合成层，跟随容器一起滚动
+                embedded
+                    ? { transform: 'none', perspective: 'none', backfaceVisibility: 'visible' }
+                    : undefined
+            }
+        >
+            {/* 吸顶背景层：向上延伸覆盖状态栏安全区，向下多铺 8px 盖住与标签栏的接缝，避免滚动时透出内容 */}
+            {!embedded && (
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 -bottom-2 top-[calc(-1*env(safe-area-inset-top))] bg-gradient-to-b from-[color-mix(in_srgb,var(--accent-color)_16%,var(--bg-color))] to-[var(--bg-color)]"
+                />
+            )}
+            <div className="relative max-w-7xl mx-auto px-4">
+                <div className="py-2 sm:py-4">
                     <div className="flex items-center justify-between gap-2 sm:gap-4">
                         <Link
                             href={isPremiumMode ? '/premium' : '/'}

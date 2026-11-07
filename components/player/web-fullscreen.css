@@ -53,9 +53,11 @@
 
 /* Force Landscape Mode for Mobile (iOS mainly) */
 .kvideo-container.is-web-fullscreen.force-landscape {
-    width: var(--kvideo-viewport-height, 100vh) !important;
-    width: var(--kvideo-viewport-height, 100dvh) !important;
-    height: var(--kvideo-viewport-width, 100vw) !important;
+    /* 旋转后「宽」对应屏幕可视高度：补上上下安全区，避免 iOS 主屏 PWA 底部漏出浅色边条 */
+    width: calc(var(--kvideo-viewport-height, 100vh) + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+    width: calc(var(--kvideo-viewport-height, 100dvh) + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)) !important;
+    /* 旋转后「高」对应屏幕可视宽度：补上左右安全区 */
+    height: calc(var(--kvideo-viewport-width, 100vw) + env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)) !important;
     top: 50% !important;
     left: 50% !important;
     /* 旋转模式下由宽高决定尺寸，重置贴边值避免相互冲突 */
@@ -65,9 +67,13 @@
     border-radius: 0 !important;
 }
 
-/* 兜底：网页全屏时把 html/body 底色也改为黑色，避免 iOS 主屏 PWA 底部安全区露出浅色背景 */
+/* 兜底：网页全屏时把页面底色变量也置黑，避免 iOS 主屏 PWA 底部安全区露出浅色背景 */
 html.kvideo-web-fullscreen-active,
 html.kvideo-web-fullscreen-active body {
+    --bg-color: #000 !important;
+    --bg-image: none !important;
+    --background: #000 !important;
     background-color: #000 !important;
     background-image: none !important;
+    min-height: 100lvh;
 }

@@ -26,6 +26,17 @@ export function useHlsPlayer({
     const { mediaProxyEnabled } = useRuntimeFeatures();
     const isAdFilterEnabled = adFilterMode !== 'off';
 
+    // 回调存放在 ref 中：父组件每次渲染都会创建新的函数引用，
+    // 若直接作为 effect 依赖，会在切集/URL 同步等重渲染时反复销毁并重建 HLS 实例，
+    // 导致同一个视频被加载两次。
+    const onErrorRef = useRef(onError);
+    const onAutoPlayPreventedRef = useRef(onAutoPlayPrevented);
+
+    useEffect(() => {
+        onErrorRef.current = onError;
+        onAutoPlayPreventedRef.current = onAutoPlayPrevented;
+    }, [onError, onAutoPlayPrevented]);
+
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !src) return;
@@ -161,7 +172,7 @@ export function useHlsPlayer({
                                 } else {
                                     // All levels are HEVC — warn user
                                     console.warn('[HLS] ⚠️ All levels are HEVC, browser may not support');
-                                    onError?.('检测到 HEVC/H.265 编码，当前浏览器可能不支持');
+                                    onErrorRef.current?.('检测到 HEVC/H.265 编码，当前浏览器可能不支持');
                                 }
                             }
                         }
@@ -170,7 +181,7 @@ export function useHlsPlayer({
                     if (autoPlay) {
                         video.play().catch((err) => {
                             // console.warn('[HLS] Autoplay prevented:', err);
-                            onAutoPlayPrevented?.(err);
+                            onAutoPlayPreventedRef.current?.(err);
                         });
                     }
                 });
@@ -188,7 +199,7 @@ export function useHlsPlayer({
                                 if (networkErrorRetries <= MAX_RETRIES) {
                                     hls?.startLoad();
                                 } else {
-                                    onError?.('网络错误：无法加载视频流');
+                                    onErrorRef.current?.('网络错误：无法加载视频流');
                                     hls?.destroy();
                                 }
                                 break;
@@ -197,13 +208,13 @@ export function useHlsPlayer({
                                 if (mediaErrorRetries <= MAX_RETRIES) {
                                     hls?.recoverMediaError();
                                 } else {
-                                    onError?.('媒体错误：视频格式不支持或已损坏');
+                                    onErrorRef.current?.('媒体错误：视频格式不支持或已损坏');
                                     hls?.destroy();
                                 }
                                 break;
                             default:
                                 console.error('[HLS] Fatal error, cannot recover:', data);
-                                onError?.(`致命错误：${data.details || '未知错误'}`);
+                                onErrorRef.current?.(`致命错误：${data.details || '未知错误'}`);
                                 hls?.destroy();
                                 break;
                         }
@@ -356,7 +367,7 @@ export function useHlsPlayer({
                         blobPlaybackFailed = true;
                         console.warn('[HLS Native] Blob URL playback failed, falling back to original source.');
                         video.removeEventListener('error', onBlobError);
-                        onError?.('当前浏览器不支持广告过滤，已回退到原始视频流');
+                        onErrorRef.current?.('当前浏览器不支持广告过滤，已回退到原始视频流');
                         // Revoke blob URLs immediately
                         extraBlobs.forEach(url => URL.revokeObjectURL(url));
                         extraBlobs = [];
@@ -382,7 +393,7 @@ export function useHlsPlayer({
                     video.addEventListener('loadeddata', onLoadedData);
                 }).catch((e) => {
                     console.warn('[HLS Native] Ad filtering failed, falling back to original source.', e);
-                    onError?.('广告过滤失败，已回退到原始视频流');
+                    onErrorRef.current?.('广告过滤失败，已回退到原始视频流');
                     video.src = src;
                 });
 
@@ -403,14 +414,14 @@ export function useHlsPlayer({
                 if (directFailed) return;
                 directFailed = true;
                 if (!mediaProxyEnabled) {
-                    onError?.('当前浏览器不支持 HLS 视频播放。建议使用 Chrome、Edge 或 Safari 浏览器。');
+                    onErrorRef.current?.('当前浏览器不支持 HLS 视频播放。建议使用 Chrome、Edge 或 Safari 浏览器。');
                     return;
                 }
                 // Try proxied URL as final attempt
                 const proxiedUrl = `/api/proxy?url=${encodeURIComponent(src)}`;
                 video.src = proxiedUrl;
                 video.addEventListener('error', () => {
-                    onError?.('当前浏览器不支持 HLS 视频播放。建议使用 Chrome、Edge 或 Safari 浏览器。');
+                    onErrorRef.current?.('当前浏览器不支持 HLS 视频播放。建议使用 Chrome、Edge 或 Safari 浏览器。');
                 }, { once: true });
             };
 
@@ -424,5 +435,5 @@ export function useHlsPlayer({
             }
             extraBlobs.forEach(url => URL.revokeObjectURL(url));
         };
-    }, [src, videoRef, autoPlay, onAutoPlayPrevented, onError, isAdFilterEnabled, adFilterMode, adKeywords, mediaProxyEnabled]);
+    }, [src, videoRef, autoPlay, isAdFilterEnabled, adFilterMode, adKeywords, mediaProxyEnabled]);
 }
