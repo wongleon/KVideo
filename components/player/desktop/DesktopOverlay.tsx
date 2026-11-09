@@ -43,6 +43,12 @@ interface DesktopOverlayProps {
     containerRef: React.RefObject<HTMLDivElement | null>;
     isRotated?: boolean;
     onBack?: () => void;
+    /** 全屏时在返回按钮右侧展示的视频名称 */
+    videoTitle?: string;
+    /** 当前分集名称 */
+    episodeName?: string;
+    /** 当前分集下标，用于分集名为空时兜底显示集数 */
+    currentEpisodeIndex?: number;
 }
 
 export function DesktopOverlay({
@@ -84,27 +90,48 @@ export function DesktopOverlay({
     containerRef,
     isRotated = false,
     onBack,
+    videoTitle = '',
+    episodeName = '',
+    currentEpisodeIndex = 0,
 }: DesktopOverlayProps) {
     // Show navigation buttons when controls are visible or when paused (controls usually show when paused anyway)
     const showNavButtons = showControls || !isPlaying;
     const showFullscreenClock = showControls || !isPlaying;
+    // 全屏时返回按钮右侧的集数信息，分集名为空时用下标兜底
+    const episodeLabel = episodeName || `第${currentEpisodeIndex + 1}集`;
 
     return (
         <>
             {/* 返回按钮：网页全屏时退出全屏回到播放页，否则返回上一页 */}
             {(onBack || isWebFullscreen) && (
                 <div
-                    className={`player-edge-padding absolute left-0 z-40 transition-opacity duration-300 ${isFullscreen ? 'top-8' : 'top-4'} ${isWebFullscreen ? '' : 'lg:hidden'} ${showControls ? 'opacity-100' : 'opacity-0'}`}
+                    className={`player-edge-padding absolute left-0 z-40 transition-opacity duration-300 ${isFullscreen ? 'top-8' : 'top-4'} ${isWebFullscreen || isFullscreen ? '' : 'lg:hidden'} ${showControls ? 'opacity-100' : 'opacity-0'}`}
                     style={{ pointerEvents: showControls ? 'auto' : 'none' }}
                 >
-                    <button
-                        onClick={isWebFullscreen ? onToggleWebFullscreen : onBack}
-                        aria-label={isWebFullscreen ? '退出网页全屏' : '返回'}
-                        title={isWebFullscreen ? '退出网页全屏' : '返回'}
-                        className="group flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white transition-all duration-300 hover:scale-110 active:scale-95"
-                    >
-                        <Icons.ChevronLeft className="text-white/80 group-hover:text-white w-5 h-5 sm:w-6 sm:h-6" />
-                    </button>
+                    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                        <button
+                            onClick={isWebFullscreen ? onToggleWebFullscreen : onBack}
+                            aria-label={isWebFullscreen ? '退出网页全屏' : '返回'}
+                            title={isWebFullscreen ? '退出网页全屏' : '返回'}
+                            className="group flex flex-shrink-0 items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full text-white transition-all duration-300 hover:scale-110 active:scale-95"
+                        >
+                            <Icons.ChevronLeft className="text-white/80 group-hover:text-white w-5 h-5 sm:w-6 sm:h-6 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]" />
+                        </button>
+
+                        {/* 全屏时展示当前播放的视频名称与集数（纯文字，名称超过 10 个字截断） */}
+                        {isFullscreen && (videoTitle || episodeName) && (
+                            <div className="flex min-w-0 items-center gap-2 text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">
+                                {videoTitle && (
+                                    <span className="max-w-[10em] truncate text-sm sm:text-base font-medium">
+                                        {videoTitle}
+                                    </span>
+                                )}
+                                <span className="flex-shrink-0 text-xs sm:text-sm font-semibold text-white/80 tabular-nums">
+                                    {episodeLabel}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 

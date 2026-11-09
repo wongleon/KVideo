@@ -469,6 +469,10 @@ export function DesktopVideoPlayer({
             onCycleWebFullscreenSize={cycleWebFullscreenSize}
             // Portal container
             containerRef={containerRef}
+            // 全屏时左上角展示的视频名称与集数
+            videoTitle={videoTitle}
+            episodeName={episodeName}
+            currentEpisodeIndex={currentEpisodeIndex}
           />
 
             <DesktopControlsWrapper

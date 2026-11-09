@@ -33,6 +33,12 @@ interface DesktopOverlayWrapperProps {
     webFullscreenSize: 'full' | 'large' | 'focused';
     onCycleWebFullscreenSize: () => void;
     containerRef: React.RefObject<HTMLDivElement | null>;
+    /** 全屏时在返回按钮右侧展示的视频名称 */
+    videoTitle?: string;
+    /** 当前分集名称 */
+    episodeName?: string;
+    /** 当前分集下标，用于分集名为空时兜底显示集数 */
+    currentEpisodeIndex?: number;
 }
 
 export function DesktopOverlayWrapper({
@@ -65,6 +71,9 @@ export function DesktopOverlayWrapper({
     webFullscreenSize,
     onCycleWebFullscreenSize,
     containerRef,
+    videoTitle = '',
+    episodeName = '',
+    currentEpisodeIndex = 0,
 }: DesktopOverlayWrapperProps) {
     const {
         isLoading,
@@ -119,6 +128,9 @@ export function DesktopOverlayWrapper({
             containerRef={containerRef}
             isRotated={isRotated}
             onBack={onBack}
+            videoTitle={videoTitle}
+            episodeName={episodeName}
+            currentEpisodeIndex={currentEpisodeIndex}
         />
     );
 }
