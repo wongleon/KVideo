@@ -6,7 +6,6 @@ interface DesktopOverlayWrapperProps {
     data: ReturnType<typeof useDesktopPlayerState>['data'];
     showControls: boolean;
     isFullscreen: boolean;
-    fullscreenClock: string;
     isRotated?: boolean;
     onBack?: () => void;
     onTogglePlay: () => void;
@@ -45,7 +44,6 @@ export function DesktopOverlayWrapper({
     data,
     showControls,
     isFullscreen,
-    fullscreenClock,
     isRotated = false,
     onBack,
     onTogglePlay,
@@ -103,7 +101,6 @@ export function DesktopOverlayWrapper({
             toastMessage={toastMessage}
             showControls={showControls}
             isFullscreen={isFullscreen}
-            fullscreenClock={fullscreenClock}
             onTogglePlay={onTogglePlay}
             onSkipForward={onSkipForward}
             onSkipBackward={onSkipBackward}

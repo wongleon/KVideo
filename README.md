@@ -13,7 +13,7 @@
 
 **在线体验：[https://kvideo.pages.dev/](https://kvideo.pages.dev/)**
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.1-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
@@ -51,12 +51,26 @@
 - **卡顿检测**：自动检测播放卡顿并提示
 - **一起看 (VideoTogether)**：播放器页面内置官方网页集成脚本，可直接创建或加入房间与朋友同步观看
 - **键盘快捷键**：空格/K 播放暂停、F 全屏、M 静音、P 画中画、J/L/方向键 快进快退、上下键 音量调节
+- **移动端信息区**：移动端播放页展示标题、年份/地区/语言/类型胶囊标签，简介可展开查看
+- **选集网格与分页**：选集支持列表与网格两种排版，长剧集按每页 50 集分段翻页
+- **猜你喜欢**：基于当前影片的类型、演员、地区推荐最多 6 条相关内容
+- **iOS 主屏幕提示**：iOS「添加到主屏幕」独立窗口受系统限制不支持画中画，点击画中画时会明确提示，而不是静默失败
+
+### 首页推荐与轮播
+
+- **推荐轮播**：顶部轮播展示热门电影、最新电影、热门剧集、热门综艺、热门美剧各一张，4 秒自动轮播，支持跟手左右滑动切换
+- **固定筛选**：推荐、热门电影、最新电影、热门剧集、热门综艺、热门美剧六个栏目，推荐栏目混合电影与剧集，切换栏目时轮播保留
+- **无限滚动**：滚动到底部自动加载下一页，多路查询交错合并并按条目去重
+- **底部悬浮导航**：发现、追剧、设置三个入口，苹果风格毛玻璃悬浮底栏，移动端与桌面端一致
 
 ### 多源并行搜索
 
+- **独立搜索页**：搜索在 `/search` 页面完成，点击首页影片或导航栏搜索入口会直接跳转到搜索结果页
+- **结果缓存恢复**：搜索结果与源筛选会缓存 30 分钟，从播放页返回搜索页时自动恢复上次结果，主动发起新搜索时自动清空
 - **聚合搜索引擎**：同时在多个视频源中并行搜索，通过 Server-Sent Events (SSE) 实时返回结果
+- **个人源参与搜索**：内置源与当前用户的个人视频源合并后一起参与并行搜索
 - **自定义视频源**：支持添加、编辑和管理自定义视频源
-- **个人视频源**：非管理员用户可添加个人视频源，不影响其他用户（数据按用户隔离）
+- **个人视频源**：所有登录用户都可添加个人视频源，不影响其他用户（数据按用户隔离）
 - **订阅源管理**：支持通过 JSON 链接批量导入和自动更新视频源
 - **JSON 批量导入**：在导入设置中直接粘贴 JSON 数组格式的视频源进行批量添加
 - **智能解析**：统一的解析器系统，自动处理不同源的数据格式
@@ -82,6 +96,7 @@
 - **源切换**：在线路列表中快速切换到其他源，支持断点续播
 - **自动切源**：当当前源不可用时，自动切换到延迟最低的可用源
 - **短链接优化**：使用 sessionStorage 缓存源数据，避免 URL 过长导致 CDN 414 错误
+- **线路记忆**：观看历史会保存播放页的完整线路列表，从历史重新进入时沿用上次的源和线路
 
 ### IPTV 直播
 
@@ -109,7 +124,7 @@
 - **电影 & 电视剧分类**：支持在电影和电视剧之间无缝切换，方便查找不同类型的影视资源
 - **详细影视信息**：自动获取豆瓣评分、演员阵容、剧情简介等详细信息
 - **推荐系统**：基于豆瓣数据的相关推荐
-- **自定义标签管理**：支持拖拽排序的标签管理器，自定义首页推荐分类
+- **标签管理（高级模式）**：高级模式提供支持拖拽排序的标签管理器，可自定义推荐分类
 - **可点击演员/导演**：播放页面的演员、导演名字可直接点击搜索其他作品
 
 ### 个性化推荐
@@ -125,6 +140,7 @@
 
 - **一键收藏**：在搜索结果和播放页面快速收藏视频
 - **收藏列表**：独立的收藏侧边栏，快速访问已收藏的视频
+- **追剧页管理**：`/history` 追剧页左上角可在「观看历史」与「我的收藏」之间切换，统一管理两类记录
 - **容量限制**：每个模式最多 100 条收藏
 - **普通/高级隔离**：普通模式和高级模式的收藏互相独立
 - **数据隔离**：多账户场景下，每个用户拥有独立的收藏数据
@@ -136,7 +152,8 @@
 - **智能去重**：按标题去重（V2），相同标题不同源的历史合并为一条
 - **容量限制**：最多保存 50 条历史记录
 - **历史管理**：支持删除单条历史或清空全部历史
-- **隐私保护**：所有数据存储在本地，不上传到服务器
+- **云端合并**：从服务端拉取记录时按更新时间与本地合并，避免云端尚未推送完成时用旧数据覆盖最新进度；页面重新可见或从播放器返回时自动再同步一次
+- **本地优先**：默认所有数据存储在本地；仅当部署者配置了 Upstash Redis 时才进行按账户的云端同步
 
 ### 弹幕 (Danmaku)
 
@@ -175,6 +192,7 @@
 - **可安装应用**：支持将 KVideo 安装为独立应用
 - **Service Worker**：离线缓存和资源预加载
 - **全屏体验**：独立应用模式下的沉浸式体验
+- **iOS 主屏幕优化**：内置 180x180 `apple-touch-icon` 与多尺寸启动图，图标和 manifest 使用长缓存，减少「添加到主屏幕」时的重复请求
 - **配置同步**：iOS Safari 添加到主屏幕后，视频源和设置自动从服务端同步，无需重新配置
 
 ### 跨设备配置同步
@@ -241,6 +259,8 @@
 
 - **设置导出/导入**：支持将所有设置导出为 JSON 文件，方便备份和迁移
 - **JSON 批量导入**：支持粘贴 JSON 数组格式的视频源进行批量导入
+- **版本与更新**：设置页显示当前版本和最近更新内容，支持手动检查更新
+- **分段折叠**：设置页各分节默认收起，点击标题展开，减少长页面滚动
 - **滚动位置记忆**：退出或刷新页面后，自动恢复到之前的滚动位置
 - **返回顶部**：一键返回页面顶部
 - **数据隔离**：多账户场景下，所有用户数据（历史、收藏、设置、个人源）按 profileId 完全隔离
@@ -249,8 +269,8 @@
 
 本应用注重用户隐私：
 
-- **本地存储**：所有数据存储在本地浏览器中
-- **无服务器数据**：不收集或上传任何用户数据
+- **本地存储**：默认所有数据存储在本地浏览器中
+- **可选云端同步**：仅在部署者配置 Upstash Redis 后，配置、观看历史和收藏才会按账户同步；未配置时不会向服务端上传任何用户数据
 - **自定义源**：用户可自行配置视频源
 - **数据隔离**：多账户场景下，每个用户的数据（历史、收藏、设置、个人源）完全隔离
 - **Profile ID**：基于密码的 SHA-256 哈希生成唯一用户标识，密码不可逆推
@@ -390,9 +410,9 @@ docker run -d -p 3000:3000 \
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `NEXT_PUBLIC_SITE_TITLE` | 浏览器标签页标题 | `KVideo - 视频聚合平台` |
+| `NEXT_PUBLIC_SITE_TITLE` | 浏览器标签页标题 | `小视界 - 视频聚合平台` |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | 站点描述 | `视频聚合平台` |
-| `NEXT_PUBLIC_SITE_NAME` | 站点头部名称 | `KVideo` |
+| `NEXT_PUBLIC_SITE_NAME` | 站点头部名称 | `小视界` |
 
 ### 配置示例：
 
@@ -728,9 +748,9 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 | `PORT` | 自定义应用端口 | `3000` |
 | `ALLOW_LAN_ACCESS` / `NEXT_PUBLIC_ALLOW_LAN_ACCESS` | 允许同局域网设备通过当前设备 IP 访问本机开发或传统 Node.js 自托管服务 | `false` |
 | `LAN_ALLOWED_DEV_ORIGINS` / `NEXT_PUBLIC_LAN_ALLOWED_DEV_ORIGINS` | 追加 Next.js 开发模式允许访问 dev 资源的主机名或通配符 | - |
-| `NEXT_PUBLIC_SITE_TITLE` | 浏览器标签页标题 | `KVideo - 视频聚合平台` |
+| `NEXT_PUBLIC_SITE_TITLE` | 浏览器标签页标题 | `小视界 - 视频聚合平台` |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | 站点描述 | `视频聚合平台` |
-| `NEXT_PUBLIC_SITE_NAME` | 站点头部名称 | `KVideo` |
+| `NEXT_PUBLIC_SITE_NAME` | 站点头部名称 | `小视界` |
 | `SITE_ICON_FILE` | Docker 运行时图标文件路径（优先于 `SITE_ICON_URL`） | - |
 | `SITE_ICON_URL` | Docker 运行时图标 URL 或站内路径 | - |
 | `SUBSCRIPTION_SOURCES` | 自动订阅源配置（服务端） | - |
@@ -752,7 +772,7 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| **[Next.js](https://nextjs.org/)** | 16.1.7 | React 框架，使用 App Router |
+| **[Next.js](https://nextjs.org/)** | 16.2.12 | React 框架，使用 App Router |
 | **[React](https://react.dev/)** | 19.2.4 | UI 组件库 |
 | **[TypeScript](https://www.typescriptlang.org/)** | 5.x | 类型安全的 JavaScript |
 | **[Tailwind CSS](https://tailwindcss.com/)** | 4.x | 实用优先的 CSS 框架 |
@@ -763,7 +783,7 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 
 ### 开发工具
 
-- **ESLint 10**：代码质量检查
+- **ESLint 9**：代码质量检查
 - **PostCSS 8**：CSS 处理器
 - **Vercel Analytics**：仅在 Vercel 部署中启用的性能监控和分析
 - **Cloudflare Pages**：边缘部署支持
@@ -1121,7 +1141,6 @@ KVideo v4.5.0+ 已增加多级回退机制，会依次尝试 HLS.js、原生 HLS
   如果这个项目对你有帮助，请考虑给一个 ⭐️
 </div>
 
-# Buy Me A Coffee
 # Buy Me A Coffee
 [![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=kuekhaoyang&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/kuekhaoyang)
 

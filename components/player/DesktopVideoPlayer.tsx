@@ -104,7 +104,6 @@ export function DesktopVideoPlayer({
     const saved = localStorage.getItem(WEB_FULLSCREEN_SIZE_KEY);
     return saved === 'large' || saved === 'focused' || saved === 'full' ? saved : 'full';
   });
-  const [fullscreenClock, setFullscreenClock] = React.useState('');
 
   // Detect actual video resolution
   const videoResolution = useVideoResolution(refs.videoRef);
@@ -190,27 +189,6 @@ export function DesktopVideoPlayer({
     const unsubscribe = store.subscribe(syncSeekStep);
     return () => unsubscribe();
   }, [isPremium]);
-
-  React.useEffect(() => {
-    if (!data.isFullscreen) {
-      setFullscreenClock('');
-      return;
-    }
-
-    const formatter = new Intl.DateTimeFormat('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-
-    const updateClock = () => {
-      setFullscreenClock(formatter.format(new Date()));
-    };
-
-    updateClock();
-    const interval = window.setInterval(updateClock, 30000);
-    return () => window.clearInterval(interval);
-  }, [data.isFullscreen]);
 
   // Initialize HLS Player
   useHlsPlayer({
@@ -427,7 +405,6 @@ export function DesktopVideoPlayer({
             data={data}
             showControls={data.showControls}
             isFullscreen={data.isFullscreen}
-            fullscreenClock={fullscreenClock}
             isRotated={shouldForceLandscape}
             onBack={onBack}
             onTogglePlay={togglePlay}

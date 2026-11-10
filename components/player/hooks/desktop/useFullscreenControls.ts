@@ -51,6 +51,9 @@ type FullscreenCapableElement = HTMLDivElement & {
 
 type PiPCapableVideoElement = HTMLVideoElement & {
     webkitEnterFullscreen?: () => void;
+    webkitExitFullscreen?: () => void;
+    /** iOS Safari 系统视频全屏中时为 true */
+    webkitDisplayingFullscreen?: boolean;
     webkitSupportsPresentationMode?: (mode: 'picture-in-picture') => boolean;
     webkitPresentationMode?: 'inline' | 'picture-in-picture' | string;
     webkitSetPresentationMode?: (mode: 'inline' | 'picture-in-picture') => void;
@@ -218,9 +221,14 @@ export function useFullscreenControls({
 
     const exitNativeFullscreen = useCallback(async () => {
         const fullscreenDocument = getFullscreenDocument();
+        const video = videoRef.current as PiPCapableVideoElement | null;
 
         try {
-            if (fullscreenDocument.exitFullscreen) {
+            // iOS Safari 通过 video.webkitEnterFullscreen 进入的系统全屏没有 document 全屏元素，
+            // 需要调用视频元素自身的退出方法
+            if (video?.webkitDisplayingFullscreen && video.webkitExitFullscreen) {
+                video.webkitExitFullscreen();
+            } else if (fullscreenDocument.exitFullscreen) {
                 await fullscreenDocument.exitFullscreen();
             } else if (fullscreenDocument.webkitExitFullscreen) {
                 await fullscreenDocument.webkitExitFullscreen();
@@ -236,7 +244,7 @@ export function useFullscreenControls({
             setIsFullscreen(false);
             setFullscreenMode('none');
         }
-    }, [setFullscreenMode, setIsFullscreen, unlockOrientation]);
+    }, [setFullscreenMode, setIsFullscreen, unlockOrientation, videoRef]);
 
     const exitWindowFullscreen = useCallback(() => {
         unlockOrientation();
@@ -434,6 +442,41 @@ export function useFullscreenControls({
             document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
         };
     }, [fullscreenMode, getNativeFullscreenElement, lockLandscape, setFullscreenMode, setIsFullscreen, unlockOrientation]);
+
+    // iOS Safari 通过 video.webkitEnterFullscreen 进入/退出系统全屏时不会触发 document 的
+    // fullscreenchange，需要额外监听视频元素事件同步状态，避免退出后按钮状态残留
+    useEffect(() => {
+        const video = videoRef.current as (PiPCapableVideoElement & {
+            addEventListener: (
+                type: 'webkitbeginfullscreen' | 'webkitendfullscreen',
+                listener: (event: Event) => void
+            ) => void;
+            removeEventListener: (
+                type: 'webkitbeginfullscreen' | 'webkitendfullscreen',
+                listener: (event: Event) => void
+            ) => void;
+        }) | null;
+        if (!video) return;
+
+        const handleBeginFullscreen = () => {
+            setIsFullscreen(true);
+            setFullscreenMode('native');
+        };
+
+        const handleEndFullscreen = () => {
+            unlockOrientation();
+            setIsFullscreen(false);
+            setFullscreenMode('none');
+        };
+
+        video.addEventListener('webkitbeginfullscreen', handleBeginFullscreen);
+        video.addEventListener('webkitendfullscreen', handleEndFullscreen);
+
+        return () => {
+            video.removeEventListener('webkitbeginfullscreen', handleBeginFullscreen);
+            video.removeEventListener('webkitendfullscreen', handleEndFullscreen);
+        };
+    }, [setFullscreenMode, setIsFullscreen, unlockOrientation, videoRef]);
 
     useEffect(() => {
         if (fullscreenMode !== 'window') return;
