@@ -327,11 +327,9 @@ export function DesktopVideoPlayer({
       logic.skipForward();
       handleMouseMove(); // Reset 3s auto-hide timer
     },
-    // 控件隐藏态下，双击中间区域切换播放/暂停
+    // 双击中间区域切换播放/暂停，再次双击恢复
     onDoubleTapCenter: () => {
-      if (!data.showControls) {
-        togglePlay();
-      }
+      togglePlay();
     },
     onSkipContinueLeft: () => {
       logic.skipBackward();
@@ -344,6 +342,14 @@ export function DesktopVideoPlayer({
     isSkipModeActive: data.showSkipForwardIndicator || data.showSkipBackwardIndicator,
   });
 
+  // 触摸手势绑定在播放器容器上，避免视频被覆盖层遮挡时手势失效；
+  // 交互控件（按钮/进度条/控制条）上的触摸不参与手势判定
+  const handleContainerTap = React.useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, a, input, [role="slider"], [data-player-controls]')) return;
+    handleTap(e);
+  }, [handleTap]);
+
   return (
     <div
       ref={containerRef}
@@ -352,6 +358,7 @@ export function DesktopVideoPlayer({
       style={containerStyle}
       onMouseMove={() => { handleMouseMove(); }}
       onMouseLeave={() => isPlaying && setShowControls(false)}
+      onTouchStart={isMobile ? handleContainerTap : undefined}
     >
       <div className={stageClassName}>
         {/* Clipping Wrapper for video and overlays - Restores the 'Liquid Glass' rounded look */}
@@ -377,7 +384,6 @@ export function DesktopVideoPlayer({
             onClick={!isMobile ? () => {
               togglePlay();
             } : undefined}
-            onTouchStart={isMobile ? handleTap : undefined}
             {...LEGACY_INLINE_VIDEO_PROPS} // Legacy iOS support
           />
 
@@ -389,16 +395,6 @@ export function DesktopVideoPlayer({
               isPlaying={isPlaying}
               duration={duration}
             />
-          )}
-
-          {/* Video Resolution Badge - follows controls bar visibility */}
-          {videoResolution && (
-            <div className={`absolute top-3 left-3 z-20 pointer-events-none transition-opacity duration-300 ${data.showControls ? 'opacity-80' : 'opacity-0'}`}>
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${videoResolution.color}`}>
-                {videoResolution.label}
-                <span className="font-normal opacity-80">{videoResolution.width}x{videoResolution.height}</span>
-              </span>
-            </div>
           )}
 
           <DesktopOverlayWrapper

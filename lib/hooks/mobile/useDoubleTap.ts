@@ -34,15 +34,15 @@ export function useDoubleTap({
     });
     const singleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const handleTap = (e: React.TouchEvent<HTMLVideoElement>) => {
+    const handleTap = (e: React.TouchEvent<HTMLElement>) => {
         const currentTime = Date.now();
-        const videoElement = e.currentTarget;
+        const targetElement = e.currentTarget;
         const touch = e.touches[0] || e.changedTouches[0];
 
-        if (!touch || !videoElement) return;
+        if (!touch || !targetElement) return;
 
-        // Calculate touch position relative to video element
-        const rect = videoElement.getBoundingClientRect();
+        // Calculate touch position relative to the element
+        const rect = targetElement.getBoundingClientRect();
         const x = touch.clientX - rect.left;
         const width = rect.width;
         // 三分区：中间占比 centerZoneRatio，左右各占剩余的一半

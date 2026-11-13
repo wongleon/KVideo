@@ -3,6 +3,12 @@
     container-type: inline-size;
 }
 
+/* 禁用双击缩放，保证移动端双击手势能被播放器接管 */
+.kvideo-container,
+.kvideo-container video {
+    touch-action: manipulation;
+}
+
 .spinner {
     width: 48px;
     height: 48px;

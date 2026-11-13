@@ -68,6 +68,7 @@ export function DesktopControls(props: DesktopControlsProps) {
 
     return (
         <div
+            data-player-controls
             className={`absolute bottom-0 left-0 right-0 z-30 transition-all duration-300 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
                 }`}
             style={{
