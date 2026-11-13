@@ -317,6 +317,9 @@ export function DesktopVideoPlayer({
   const isTopAlignedWebFullscreen = data.fullscreenMode === 'window' && isMobile && !isLandscape && !shouldForceLandscape;
 
   // Mobile double-tap gesture for skip forward/backward
+  // 双击切换播放后，同一次触摸序列末尾的 click 可能落在刚出现的中心播放按钮上，短暂忽略
+  const overlayPlayGuardRef = React.useRef(0);
+
   const { handleTap } = useDoubleTap({
     onSingleTap: handleTouchToggleControls,
     onDoubleTapLeft: () => {
@@ -329,6 +332,7 @@ export function DesktopVideoPlayer({
     },
     // 双击中间区域切换播放/暂停，再次双击恢复
     onDoubleTapCenter: () => {
+      overlayPlayGuardRef.current = Date.now();
       togglePlay();
     },
     onSkipContinueLeft: () => {
@@ -342,13 +346,28 @@ export function DesktopVideoPlayer({
     isSkipModeActive: data.showSkipForwardIndicator || data.showSkipBackwardIndicator,
   });
 
-  // 触摸手势绑定在播放器容器上，避免视频被覆盖层遮挡时手势失效；
+  // 触摸手势绑定在播放器容器上，任何落点都能捕获；
   // 交互控件（按钮/进度条/控制条）上的触摸不参与手势判定
+  const lastTouchAtRef = React.useRef(0);
+
   const handleContainerTap = React.useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    lastTouchAtRef.current = Date.now();
     const target = e.target as HTMLElement | null;
     if (target?.closest('button, a, input, [role="slider"], [data-player-controls]')) return;
     handleTap(e);
   }, [handleTap]);
+
+  // 触摸设备上的 click 由触摸手势统一处理，避免同一次操作触发两次播放状态切换
+  const handleVideoClick = React.useCallback(() => {
+    if (Date.now() - lastTouchAtRef.current < 600) return;
+    togglePlay();
+  }, [togglePlay]);
+
+  // 中心播放按钮：双击刚切换完的 500ms 内忽略 click，避免同一次触摸把它又切回去
+  const handleOverlayTogglePlay = React.useCallback(() => {
+    if (Date.now() - overlayPlayGuardRef.current < 500) return;
+    togglePlay();
+  }, [togglePlay]);
 
   return (
     <div
@@ -358,7 +377,7 @@ export function DesktopVideoPlayer({
       style={containerStyle}
       onMouseMove={() => { handleMouseMove(); }}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      onTouchStart={isMobile ? handleContainerTap : undefined}
+      onTouchStart={handleContainerTap}
     >
       <div className={stageClassName}>
         {/* Clipping Wrapper for video and overlays - Restores the 'Liquid Glass' rounded look */}
@@ -381,9 +400,7 @@ export function DesktopVideoPlayer({
             onError={handleVideoError}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
-            onClick={!isMobile ? () => {
-              togglePlay();
-            } : undefined}
+            onClick={handleVideoClick}
             {...LEGACY_INLINE_VIDEO_PROPS} // Legacy iOS support
           />
 
@@ -403,7 +420,7 @@ export function DesktopVideoPlayer({
             isFullscreen={data.isFullscreen}
             isRotated={shouldForceLandscape}
             onBack={onBack}
-            onTogglePlay={togglePlay}
+            onTogglePlay={handleOverlayTogglePlay}
             onSkipForward={logic.skipForward}
             onSkipBackward={logic.skipBackward}
             isTransitioningToNextEpisode={isTransitioningToNextEpisode}
