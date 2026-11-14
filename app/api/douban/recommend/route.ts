@@ -25,7 +25,10 @@ async function fetchUpstream(url: string): Promise<Response> {
           'Referer': 'https://movie.douban.com/',
         },
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-      });
+        // 保留边缘缓存：豆瓣对高频回源会限流甚至挂起，缓存命中时首屏才能稳定秒开。
+        // TTL 不宜过长，避免限流时的空结果长期固化；超时与重试作为未命中时的兜底。
+        cf: { cacheEverything: true, cacheTtl: 300 },
+      } as RequestInit & { cf: { cacheEverything: boolean; cacheTtl: number } });
 
       if (response.status >= 500 && attempt < MAX_ATTEMPTS) {
         await delay(RETRY_DELAY_MS);
@@ -54,8 +57,6 @@ export async function GET(request: Request) {
   try {
     const url = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(tag)}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`;
 
-    // 不再使用 cf.cacheEverything：同一上游 URL 的请求在边缘节点合并后，
-    // 一次挂起会把后续同 URL 请求一起拖到超时，反而放大了故障
     const response = await fetchUpstream(url);
 
     if (!response.ok) {

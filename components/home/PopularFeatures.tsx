@@ -269,6 +269,8 @@ interface DoubanFeedProps {
 const MAX_AUTO_RETRIES = 3;
 /** 自动重试的基础退避时间，按失败次数递增 */
 const RETRY_BASE_DELAY = 3000;
+/** 失败后的短暂冷却：拦截观察器重建带来的立即重复请求，真正的重试交给退避定时器 */
+const RETRY_COOLDOWN = 1000;
 
 function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
   const [movies, setMovies] = useState<DoubanMovie[]>([]);
@@ -280,6 +282,16 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
   const inFlightRef = useRef(false);
   const failedCountRef = useRef(0);
   const cooldownUntilRef = useRef(0);
+
+  /** 记录一次暂时性失败，并在首次若干次失败后安排退避重试 */
+  const scheduleRetry = useCallback((targetPage: number) => {
+    failedCountRef.current += 1;
+    cooldownUntilRef.current = Date.now() + RETRY_COOLDOWN;
+
+    if (failedCountRef.current <= MAX_AUTO_RETRIES) {
+      setRetryPage(targetPage);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -307,9 +319,13 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
       if (cancelled) return;
       setLoading(false);
 
-      // 暂时性失败（超时/5xx）时保留已有内容，不清空
-      if (result.temporaryFailure) return;
+      if (result.temporaryFailure) {
+        // 首屏拿不到数据同样进入退避重试，避免直接落到「暂无内容」
+        scheduleRetry(0);
+        return;
+      }
 
+      failedCountRef.current = 0;
       setMovies(result.movies);
       setHasMore(result.hasMore);
       writeFirstPageCache(queries, result.movies);
@@ -318,7 +334,7 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
     return () => {
       cancelled = true;
     };
-  }, [queries]);
+  }, [queries, scheduleRetry]);
 
   const loadMore = useCallback(async (nextPage: number) => {
     // 防重入：加载中或处于失败冷却期时忽略观察器重建带来的重复触发
@@ -338,14 +354,8 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
     if (!result) return;
 
     if (result.temporaryFailure) {
-      failedCountRef.current += 1;
       // 失败不推进分页、不结束信息流：保持 hasMore 不变，退避后自动重试
-      cooldownUntilRef.current =
-        Date.now() + RETRY_BASE_DELAY * Math.min(failedCountRef.current, MAX_AUTO_RETRIES);
-
-      if (failedCountRef.current <= MAX_AUTO_RETRIES) {
-        setRetryPage(nextPage);
-      }
+      scheduleRetry(nextPage);
       return;
     }
 
@@ -357,7 +367,10 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
     });
     setPage(nextPage);
     setHasMore(result.hasMore);
-  }, [queries]);
+
+    // 首屏失败后的重试同样要回填缓存
+    if (nextPage === 0) writeFirstPageCache(queries, result.movies);
+  }, [queries, scheduleRetry]);
 
   // 失败后的指数退避重试
   useEffect(() => {
