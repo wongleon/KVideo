@@ -1,64 +1,35 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { TagManager } from '@/components/home/TagManager';
 import { MovieGrid } from '@/components/home/MovieGrid';
 import { PremiumContentGrid } from './PremiumContentGrid';
-import { usePremiumTagManager } from '@/lib/hooks/usePremiumTagManager';
 import { usePremiumContent } from '@/lib/hooks/usePremiumContent';
 import { usePersonalizedRecommendations } from '@/components/home/hooks/usePersonalizedRecommendations';
 
+type RecommendState = ReturnType<typeof usePersonalizedRecommendations>;
+
 interface PremiumContentProps {
     onSearch?: (query: string) => void;
+    /** 当前分类对应的筛选值；推荐模式下传空字符串 */
+    categoryValue: string;
+    /** 是否处于「为你推荐」标签 */
+    recommendSelected: boolean;
+    /** 推荐数据由页面层持有，便于标签栏与内容区共享同一份状态 */
+    recommend: RecommendState;
 }
 
-export function PremiumContent({ onSearch }: PremiumContentProps) {
-    const {
-        tags,
-        selectedTag,
-        newTagInput,
-        showTagManager,
-        justAddedTag,
-        setSelectedTag,
-        setNewTagInput,
-        setShowTagManager,
-        setJustAddedTag,
-        handleAddTag,
-        handleDeleteTag,
-        handleRestoreDefaults,
-        handleDragEnd,
-    } = usePremiumTagManager();
-
-    const {
-        movies: recommendMovies,
-        loading: recommendLoading,
-        hasMore: recommendHasMore,
-        hasHistory,
-        prefetchRef: recommendPrefetchRef,
-        loadMoreRef: recommendLoadMoreRef,
-    } = usePersonalizedRecommendations(true);
-
-    // Track whether the recommendation tab is active
-    const [isRecommendSelected, setIsRecommendSelected] = useState(hasHistory);
-
-    useEffect(() => {
-        if (hasHistory) {
-            setIsRecommendSelected(true);
-        }
-    }, [hasHistory]);
-
-    const effectiveRecommendSelected = hasHistory && isRecommendSelected;
-
-    // Get the category value from selected tag
-    const categoryValue = tags.find(t => t.id === selectedTag)?.value || '';
-
+export function PremiumContent({
+    onSearch,
+    categoryValue,
+    recommendSelected,
+    recommend,
+}: PremiumContentProps) {
     const {
         videos,
         loading,
         hasMore,
         prefetchRef,
         loadMoreRef,
-    } = usePremiumContent(effectiveRecommendSelected ? '' : categoryValue);
+    } = usePremiumContent(recommendSelected ? '' : categoryValue);
 
     const handleVideoClick = (video: any) => {
         if (onSearch) {
@@ -66,46 +37,16 @@ export function PremiumContent({ onSearch }: PremiumContentProps) {
         }
     };
 
-    const handleRecommendSelect = () => {
-        setIsRecommendSelected(true);
-    };
-
-    const handleRegularTagSelect = (tagId: string) => {
-        setIsRecommendSelected(false);
-        setSelectedTag(tagId);
-    };
-
     return (
         <div className="animate-fade-in">
-            <TagManager
-                tags={tags}
-                selectedTag={effectiveRecommendSelected ? '' : selectedTag}
-                showTagManager={showTagManager}
-                newTagInput={newTagInput}
-                justAddedTag={justAddedTag}
-                onTagSelect={handleRegularTagSelect}
-                onTagDelete={handleDeleteTag}
-                onToggleManager={() => setShowTagManager(!showTagManager)}
-                onRestoreDefaults={handleRestoreDefaults}
-                onNewTagInputChange={setNewTagInput}
-                onAddTag={handleAddTag}
-                onDragEnd={handleDragEnd}
-                onJustAddedTagHandled={() => setJustAddedTag(false)}
-                recommendTag={hasHistory ? {
-                    label: '为你推荐',
-                    isSelected: effectiveRecommendSelected,
-                    onSelect: handleRecommendSelect,
-                } : undefined}
-            />
-
-            {effectiveRecommendSelected ? (
+            {recommendSelected ? (
                 <MovieGrid
-                    movies={recommendMovies}
-                    loading={recommendLoading}
-                    hasMore={recommendHasMore}
+                    movies={recommend.movies}
+                    loading={recommend.loading}
+                    hasMore={recommend.hasMore}
                     onMovieClick={handleVideoClick}
-                    prefetchRef={recommendPrefetchRef}
-                    loadMoreRef={recommendLoadMoreRef}
+                    prefetchRef={recommend.prefetchRef}
+                    loadMoreRef={recommend.loadMoreRef}
                 />
             ) : (
                 <PremiumContentGrid

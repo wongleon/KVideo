@@ -10,7 +10,7 @@ import { siteConfig } from '@/lib/config/site-config';
 import { getSession, clearSession, hasPermission, type AuthSession } from '@/lib/store/auth-store';
 import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
 import { clearSearchPageCache } from '@/lib/utils/search-page-cache';
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings } from 'lucide-react';
 
 interface NavbarProps {
     onReset: () => void;
@@ -129,6 +129,18 @@ export function Navbar({ onReset, isPremiumMode = false, embedded = false }: Nav
                                         <LogOut size={14} />
                                     </button>
                                 </div>
+                            )}
+                            {/* 高级模式没有底部导航，设置入口放在顶栏 */}
+                            {isPremiumMode && (
+                                <Link
+                                    href="/premium/settings"
+                                    className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
+                                    aria-label="设置"
+                                    title="设置"
+                                    data-focusable
+                                >
+                                    <Settings size={16} className="sm:w-5 sm:h-5" />
+                                </Link>
                             )}
                             <ThemeSwitcher />
                         </div>
