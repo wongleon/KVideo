@@ -48,6 +48,48 @@ export const HOME_FILTERS: HomeFilter[] = [
 
 const PAGE_LIMIT = 20;
 
+/** 首屏数据缓存有效期：路由切换回来时直接复用，超过后先展示旧数据再后台刷新 */
+const FEED_CACHE_TTL = 10 * 60 * 1000;
+
+interface CachedFeed {
+  movies: DoubanMovie[];
+  timestamp: number;
+}
+
+/**
+ * 模块级缓存：Next.js 路由切换会卸载首页组件，组件内 state 随之丢失，
+ * 放在模块作用域可以在同一次会话内跨路由保留，切回首页时立即渲染，无需重新加载。
+ */
+const firstPageCache = new Map<string, CachedFeed>();
+let carouselCache: CachedFeed | null = null;
+
+function getQueryKey(queries: DoubanQuery[]): string {
+  return queries.map((query) => `${query.type}:${query.tag}`).join('|');
+}
+
+/** 读取首屏缓存，stale 表示已过期（仍可先展示，再静默刷新） */
+function readFirstPageCache(queries: DoubanQuery[]): (CachedFeed & { stale: boolean }) | null {
+  const cached = firstPageCache.get(getQueryKey(queries));
+  if (!cached) return null;
+  return { ...cached, stale: Date.now() - cached.timestamp > FEED_CACHE_TTL };
+}
+
+function writeFirstPageCache(queries: DoubanQuery[], movies: DoubanMovie[]): void {
+  // 空结果多为豆瓣抖动，不写入缓存，避免切回来看到空页面
+  if (movies.length === 0) return;
+  firstPageCache.set(getQueryKey(queries), { movies, timestamp: Date.now() });
+}
+
+function readCarouselCache(): (CachedFeed & { stale: boolean }) | null {
+  if (!carouselCache) return null;
+  return { ...carouselCache, stale: Date.now() - carouselCache.timestamp > FEED_CACHE_TTL };
+}
+
+function writeCarouselCache(movies: DoubanMovie[]): void {
+  if (movies.length === 0) return;
+  carouselCache = { movies, timestamp: Date.now() };
+}
+
 /** 轮播图取图来源：热门电影、热门剧集、热门综艺、热门美剧各取一张（推荐与最新电影不参与） */
 const CAROUSEL_FILTERS = HOME_FILTERS.filter(
   (filter) => filter.id !== 'recommend' && filter.id !== 'new-movie'
@@ -208,12 +250,18 @@ interface DoubanFeedProps {
 }
 
 function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
-  const [movies, setMovies] = useState<DoubanMovie[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 首帧直接使用缓存数据，切回首页时不出现加载态闪烁
+  const initialCache = useMemo(() => readFirstPageCache(queries), [queries]);
+  const [movies, setMovies] = useState<DoubanMovie[]>(initialCache?.movies ?? []);
+  const [loading, setLoading] = useState(!initialCache);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
+    const cached = readFirstPageCache(queries);
+    // 命中且未过期：直接复用，不再请求
+    if (cached && !cached.stale) return;
+
     let cancelled = false;
 
     fetchDoubanPage(queries, 0).then((list) => {
@@ -221,6 +269,7 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
       setMovies(list);
       setHasMore(list.length > 0);
       setLoading(false);
+      writeFirstPageCache(queries, list);
     });
 
     return () => {
@@ -266,8 +315,10 @@ interface PopularFeaturesProps {
 }
 
 export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesProps) {
-  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张
-  const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>([]);
+  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张（优先复用缓存）
+  const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>(
+    () => readCarouselCache()?.movies ?? []
+  );
 
   const activeFilter = useMemo(
     () => HOME_FILTERS.find((filter) => filter.id === selectedFilterId) ?? HOME_FILTERS[0],
@@ -282,14 +333,20 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
 
   // 首屏并行拉取四个分类，各取列表第一张组成轮播图
   useEffect(() => {
+    const cached = readCarouselCache();
+    // 命中且未过期：直接复用，不再请求
+    if (cached && !cached.stale) return;
+
     let cancelled = false;
 
     // 「最新电影」不在轮播图里，但其余标签的数据在推荐与轮播阶段其实都已请求过，
     // 只有它要等用户切换时才首次请求，容易撞上豆瓣冷请求的抖动而暂时查不到。
-    // 这里首屏预热一次（结果不入轮播），切换该标签时可直接命中浏览器缓存。
+    // 这里首屏预热一次（结果不入轮播），切换该标签时可直接命中缓存。
     const latestFilter = HOME_FILTERS.find((filter) => filter.id === 'new-movie');
-    if (latestFilter) {
-      void fetchDoubanPage(latestFilter.queries, 0, false);
+    if (latestFilter && !readFirstPageCache(latestFilter.queries)) {
+      void fetchDoubanPage(latestFilter.queries, 0, false).then((list) => {
+        writeFirstPageCache(latestFilter.queries, list);
+      });
     }
 
     Promise.all(CAROUSEL_FILTERS.map((filter) => fetchDoubanPage(filter.queries, 0))).then((lists) => {
@@ -305,7 +362,13 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
         picks.push(movie);
       });
 
+      // 轮播依赖的四个分类数据同时写入首屏缓存，切换标签时可直接复用
+      lists.forEach((list, index) => {
+        writeFirstPageCache(CAROUSEL_FILTERS[index].queries, list);
+      });
+
       setCarouselMovies(picks);
+      writeCarouselCache(picks);
     });
 
     return () => {

@@ -190,37 +190,6 @@ export default async function RootLayout({
 
         {/* Google Cast SDK 改为播放器按需加载（见 useCastControls）：
             脚本来自 www.gstatic.com，国内网络不可达，放根布局会拖慢所有页面的加载完成时间 */}
-
-        {/* Scroll Performance Optimization Script */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                let scrollTimer;
-                const body = document.body;
-                
-                function handleScroll() {
-                  body.classList.add('scrolling');
-                  clearTimeout(scrollTimer);
-                  scrollTimer = setTimeout(function() {
-                    body.classList.remove('scrolling');
-                  }, 150);
-                }
-                
-                let ticking = false;
-                window.addEventListener('scroll', function() {
-                  if (!ticking) {
-                    window.requestAnimationFrame(function() {
-                      handleScroll();
-                      ticking = false;
-                    });
-                    ticking = true;
-                  }
-                }, { passive: true });
-              })();
-            `,
-          }}
-        />
       </body>
     </html>
   );

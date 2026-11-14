@@ -137,8 +137,14 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 接口数据不接管，交给浏览器与 CDN 的 HTTP 缓存策略
-    if (url.pathname.startsWith('/api/')) return;
+    // 接口数据不接管，交给浏览器与 CDN 的 HTTP 缓存策略；
+    // 海报代理 URL 与图片一一对应且内容不变，走缓存优先，避免切页重建图片元素时重新下载
+    if (url.pathname.startsWith('/api/')) {
+        if (url.pathname === '/api/douban/image' && request.destination === 'image') {
+            event.respondWith(handleAsset(event));
+        }
+        return;
+    }
 
     if (CACHEABLE_DESTINATIONS.has(request.destination)) {
         event.respondWith(handleAsset(event));

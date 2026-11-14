@@ -90,12 +90,19 @@ export function BottomNav() {
         <nav
             aria-label="主导航"
             className="fixed inset-x-0 bottom-0 z-[1500] flex justify-center px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none"
+            style={{ perspective: 'none' }}
         >
             <div
-                data-keep-clickable
-                className="pointer-events-auto relative flex items-center p-1.5 rounded-[28px] border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_20%,transparent)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_var(--shadow-color)]"
+                className="pointer-events-auto relative flex items-center p-1.5 rounded-[28px]"
                 style={{ transform: 'translate3d(0, 0, 0)' }}
             >
+                {/* 毛玻璃背景单独成层：iOS PWA 下 backdrop-filter 会干扰固定底栏的点击命中，
+                    把滤镜层与交互元素分离，避免底栏偶尔点不动 */}
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-[28px] border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--bg-color)_20%,transparent)] backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_32px_var(--shadow-color)]"
+                />
+
                 {/* 透明玻璃滑动高亮：椭圆胶囊，只做位移，不引入强调色 */}
                 <div
                     aria-hidden="true"
