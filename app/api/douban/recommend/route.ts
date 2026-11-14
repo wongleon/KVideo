@@ -21,7 +21,8 @@ export async function GET(request: Request) {
       signal: AbortSignal.timeout(8000),
       // Cloudflare 边缘缓存上游响应（Node 自托管会忽略该字段）。
       // next.revalidate 依赖 Vercel 的 ISR，在 Pages/Workers 运行时不会生效。
-      cf: { cacheEverything: true, cacheTtl: 86400 },
+      // TTL 不宜过长：豆瓣偶发限流会返回空列表，过长缓存会让该标签长时间查不到内容
+      cf: { cacheEverything: true, cacheTtl: 300 },
     } as RequestInit & { cf: { cacheEverything: boolean; cacheTtl: number } });
 
     if (!response.ok) {
@@ -29,21 +30,29 @@ export async function GET(request: Request) {
     }
 
     const data = await response.json();
+    const subjects = Array.isArray(data.subjects) ? data.subjects : [];
+    const hasSubjects = subjects.length > 0;
 
     // 转换图片链接使用代理
-    if (data.subjects && Array.isArray(data.subjects)) {
-      data.subjects = data.subjects.map((item: any) => ({
+    if (hasSubjects) {
+      data.subjects = subjects.map((item: Record<string, unknown>) => ({
         ...item,
         // v=2 用于绕过此前被错误缓存（同一张图）的浏览器缓存
-        cover: item.cover ? `/api/douban/image?v=2&url=${encodeURIComponent(item.cover)}` : item.cover,
+        cover:
+          typeof item.cover === 'string'
+            ? `/api/douban/image?v=2&url=${encodeURIComponent(item.cover)}`
+            : item.cover,
       }));
     }
 
     return NextResponse.json(data, {
       headers: {
         // 允许 CDN 与浏览器缓存以提升首屏速度；同时声明 query 参与缓存键，
-        // 避免不同标签共用同一份缓存导致数据串位
-        'Cache-Control': 'public, max-age=300, s-maxage=86400, stale-while-revalidate=3600',
+        // 避免不同标签共用同一份缓存导致数据串位。
+        // 空结果（多为豆瓣限流/抖动）不缓存，否则一次失败会让该标签持续显示「暂无内容」
+        'Cache-Control': hasSubjects
+          ? 'public, max-age=300, s-maxage=86400, stale-while-revalidate=3600'
+          : 'no-store',
         'Netlify-Vary': 'query',
       },
     });
@@ -51,7 +60,7 @@ export async function GET(request: Request) {
     console.error('Douban API error:', error);
     return NextResponse.json(
       { subjects: [], error: 'Failed to fetch recommendations' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }

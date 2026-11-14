@@ -129,9 +129,11 @@ const nextConfig: NextConfig = {
     ];
 
     return [
-      { source: '/ouch-icon.png', headers: staticAssetHeaders },
+      { source: '/apple-touch-icon.png', headers: staticAssetHeaders },
       { source: '/icon.png', headers: staticAssetHeaders },
       { source: '/logo.png', headers: staticAssetHeaders },
+      // iOS 在「添加到主屏幕」时会一次性抓取全部启动图，长缓存避免反复回源
+      { source: '/splash/:path*', headers: staticAssetHeaders },
       {
         source: '/manifest.json',
         headers: [

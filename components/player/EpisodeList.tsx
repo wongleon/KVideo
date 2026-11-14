@@ -12,6 +12,7 @@ import type { VideoResolutionInfo } from './hooks/useVideoResolution';
 import type { ResolutionInfo } from '@/lib/hooks/useResolutionProbe';
 import { getCachedResolution } from '@/lib/player/resolution-cache';
 import { getSourceResolutionBadge } from '@/lib/player/source-list-utils';
+import { EpisodePickerSheet, EpisodePickerTrigger } from './EpisodePickerSheet';
 
 interface Episode {
   name?: string;
@@ -94,6 +95,8 @@ export function EpisodeList({
   // list = classic vertical list; grid = multi-column with section pages
   const [episodeLayout] = useState<'list' | 'grid'>('grid');
   const [episodePage, setEpisodePage] = useState(0);
+  // 移动端底部选集弹窗：集数超过一页（50 集）时才提供入口
+  const [isEpisodePickerOpen, setIsEpisodePickerOpen] = useState(false);
 
   const EPISODES_PER_PAGE = 50;
 
@@ -378,19 +381,35 @@ export function EpisodeList({
   const currentEpisodeLabel = episodes?.[currentEpisode]?.name || `第${currentEpisode + 1}集`;
 
   // 选集标题：移动端置于卡片外，桌面端保留在卡片内
-  const episodeHeader = (
-    <div className="text-lg sm:text-xl font-bold text-[var(--text-color)] mb-4 flex items-center gap-2 flex-wrap">
+  const episodeHeaderContent = (
+    <>
       <span>选集</span>
       {episodes && (
         <Badge variant="primary">{episodes.length}</Badge>
       )}
+    </>
+  );
+
+  const episodeHeader = (
+    <div className="text-lg sm:text-xl font-bold text-[var(--text-color)] mb-4 flex items-center gap-2 flex-wrap">
+      {episodeHeaderContent}
     </div>
   );
+
+  // 集数超过一页（50 集）时，移动端标题右侧提供底部弹窗入口
+  const showEpisodePickerButton = !!episodes && episodes.length > EPISODES_PER_PAGE;
 
   return (
     <>
       {/* 移动端：选集标题置于卡片外，位于线路胶囊上方 */}
-      <div className="lg:hidden">{episodeHeader}</div>
+      <div className="lg:hidden mb-4 flex items-center justify-between gap-3">
+        <div className="text-lg font-bold text-[var(--text-color)] flex items-center gap-2 flex-wrap">
+          {episodeHeaderContent}
+        </div>
+        {showEpisodePickerButton && (
+          <EpisodePickerTrigger onClick={() => setIsEpisodePickerOpen(true)} />
+        )}
+      </div>
 
       {/* 移动端：线路胶囊，横向滚动切换（卡片外） */}
       {showSourceSelector && (
@@ -811,6 +830,20 @@ export function EpisodeList({
         </div>
       )}
       </div>
+
+      {/* 移动端底部选集弹窗：默认隐藏，点击「选集 >」后唤起 */}
+      <EpisodePickerSheet
+        isOpen={isEpisodePickerOpen}
+        onClose={() => setIsEpisodePickerOpen(false)}
+        episodes={displayEpisodes || []}
+        currentIndex={getDisplayIndex(currentEpisode)}
+        onSelect={(displayIndex) => {
+          const episode = displayEpisodes?.[displayIndex];
+          if (!episode) return;
+          onEpisodeClick(episode, getOriginalIndex(displayIndex));
+          setIsEpisodePickerOpen(false);
+        }}
+      />
     </>
   );
 }

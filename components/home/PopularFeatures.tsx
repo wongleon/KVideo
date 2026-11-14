@@ -54,7 +54,11 @@ const CAROUSEL_FILTERS = HOME_FILTERS.filter(
 );
 
 /** 拉取一页豆瓣数据，多路查询交错合并并去重 */
-async function fetchDoubanPage(queries: DoubanQuery[], pageNumber: number): Promise<DoubanMovie[]> {
+async function fetchDoubanPage(
+  queries: DoubanQuery[],
+  pageNumber: number,
+  allowRetry = true
+): Promise<DoubanMovie[]> {
   const pageStart = pageNumber * PAGE_LIMIT;
 
   const results = await Promise.all(
@@ -83,6 +87,13 @@ async function fetchDoubanPage(queries: DoubanQuery[], pageNumber: number): Prom
       seen.add(movie.id);
       merged.push(movie);
     }
+  }
+
+  // 首屏为空通常是豆瓣偶发超时或限流（而非真的没有内容），静默重试一次，
+  // 避免刚切到该标签就误显示「暂无内容」
+  if (merged.length === 0 && allowRetry && pageNumber === 0) {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    return fetchDoubanPage(queries, pageNumber, false);
   }
 
   return merged;
@@ -272,6 +283,14 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
   // 首屏并行拉取四个分类，各取列表第一张组成轮播图
   useEffect(() => {
     let cancelled = false;
+
+    // 「最新电影」不在轮播图里，但其余标签的数据在推荐与轮播阶段其实都已请求过，
+    // 只有它要等用户切换时才首次请求，容易撞上豆瓣冷请求的抖动而暂时查不到。
+    // 这里首屏预热一次（结果不入轮播），切换该标签时可直接命中浏览器缓存。
+    const latestFilter = HOME_FILTERS.find((filter) => filter.id === 'new-movie');
+    if (latestFilter) {
+      void fetchDoubanPage(latestFilter.queries, 0, false);
+    }
 
     Promise.all(CAROUSEL_FILTERS.map((filter) => fetchDoubanPage(filter.queries, 0))).then((lists) => {
       if (cancelled) return;
