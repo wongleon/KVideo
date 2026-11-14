@@ -108,13 +108,6 @@ export function DesktopVideoPlayer({
   // Detect actual video resolution
   const videoResolution = useVideoResolution(refs.videoRef);
 
-  // 网页全屏舞台的宽高比跟随视频真实比例，未就绪时回退 16:9
-  const stageAspect = React.useMemo(() => {
-    const width = videoResolution?.width ?? 0;
-    const height = videoResolution?.height ?? 0;
-    return width > 0 && height > 0 ? width / height : 16 / 9;
-  }, [videoResolution]);
-
   // Notify parent when resolution is detected
   React.useEffect(() => {
     if (videoResolution && onResolutionDetected) {
@@ -298,10 +291,8 @@ export function DesktopVideoPlayer({
       ['--kvideo-stage-viewport-width' as string]: `${stageWidth}px`,
       ['--kvideo-stage-viewport-height' as string]: `${stageHeight}px`,
       ['--kvideo-web-scale' as string]: WEB_FULLSCREEN_SCALE[webFullscreenSize].toString(),
-      ['--kvideo-stage-aspect' as string]: stageAspect.toString(),
-      ['--kvideo-stage-aspect-inverse' as string]: (1 / stageAspect).toString(),
     };
-  }, [data.fullscreenMode, shouldForceLandscape, viewportMetrics, webFullscreenSize, stageAspect]);
+  }, [data.fullscreenMode, shouldForceLandscape, viewportMetrics, webFullscreenSize]);
 
   const shouldHideCursor = shouldHidePlayerCursor({
     isFullscreen: data.isFullscreen,
@@ -322,8 +313,6 @@ export function DesktopVideoPlayer({
   // 存在下一集时在控制条显示「下一集」按钮（全屏，或移动端始终显示）
   const hasNextEpisode = Boolean(onNextEpisode) && totalEpisodes > 1;
   const showNextEpisode = hasNextEpisode && (data.isFullscreen || isMobile);
-
-  const isTopAlignedWebFullscreen = data.fullscreenMode === 'window' && isMobile && !isLandscape && !shouldForceLandscape;
 
   // Mobile double-tap gesture for skip forward/backward
   // 双击切换播放后，同一次触摸序列末尾的 click 可能落在刚出现的中心播放按钮上，短暂忽略
@@ -382,7 +371,7 @@ export function DesktopVideoPlayer({
     <div
       ref={containerRef}
       className={`kvideo-container relative aspect-video bg-black group ${data.fullscreenMode === 'window' ? `is-web-fullscreen web-size-${webFullscreenSize}` : ''
-        } ${shouldForceLandscape ? 'force-landscape' : ''} ${isTopAlignedWebFullscreen ? 'top-align-stage' : ''} overflow-hidden rounded-none sm:rounded-[var(--radius-2xl)]`}
+        } ${shouldForceLandscape ? 'force-landscape' : ''} overflow-hidden rounded-none sm:rounded-[var(--radius-2xl)]`}
       style={containerStyle}
       onMouseMove={() => { handleMouseMove(); }}
       onMouseLeave={() => isPlaying && setShowControls(false)}

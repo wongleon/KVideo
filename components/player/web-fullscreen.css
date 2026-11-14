@@ -15,21 +15,13 @@
     align-items: center !important;
     justify-content: center !important;
     --kvideo-web-scale: 1;
-    /* 舞台比例默认 16:9，运行时由播放器按视频真实分辨率注入 */
-    --kvideo-stage-aspect: 1.7778;
-    --kvideo-stage-aspect-inverse: 0.5625;
 }
 
-.kvideo-container.is-web-fullscreen.top-align-stage {
-    align-items: flex-start !important;
-    padding-top: calc(env(safe-area-inset-top, 0px) + clamp(0px, 1.5vh, 16px)) !important;
-}
-
-/* 舞台按视频真实比例适配视口（contain），不裁切画面 */
+/* 播放器区域固定为视口尺寸（按尺寸档位等比缩放），视频在区域内按自身比例适配 */
 .kvideo-container.is-web-fullscreen .kvideo-web-fullscreen-stage {
     position: relative !important;
-    width: min(calc(var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) * var(--kvideo-web-scale)), calc(var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) * var(--kvideo-web-scale) * var(--kvideo-stage-aspect, 1.7778))) !important;
-    height: min(calc(var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) * var(--kvideo-web-scale)), calc(var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) * var(--kvideo-web-scale) * var(--kvideo-stage-aspect-inverse, 0.5625))) !important;
+    width: calc(var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) * var(--kvideo-web-scale)) !important;
+    height: calc(var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) * var(--kvideo-web-scale)) !important;
     max-width: var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) !important;
     max-height: var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) !important;
 }
