@@ -138,8 +138,18 @@ img {
     transform: translateZ(0);
 }
 
+/* 滚动期间禁用内容区指针事件以降低重绘。
+   注意：该规则会命中所有后代元素，若不加排除，滚动结束后的 150ms 内点击
+   （尤其是从其他页面返回首页时，滚动位置恢复会反复触发滚动事件）
+   会被整页吞掉，表现为「点底部导航没反应」。
+   因此底部导航等常驻悬浮控件通过 data-keep-clickable 豁免。 */
 body.scrolling * {
     pointer-events: none !important;
+}
+
+body.scrolling [data-keep-clickable],
+body.scrolling [data-keep-clickable] a {
+    pointer-events: auto !important;
 }
 
 .group:hover img,
