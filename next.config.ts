@@ -129,6 +129,12 @@ const nextConfig: NextConfig = {
     ];
 
     return [
+      // Service Worker 必须每次校验，否则发版后客户端迟迟拿不到新脚本，
+      // 旧的缓存外壳会继续引用已失效的构建产物，PWA 会一直加载不出来
+      {
+        source: '/sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, must-revalidate' }],
+      },
       { source: '/apple-touch-icon.png', headers: staticAssetHeaders },
       { source: '/icon.png', headers: staticAssetHeaders },
       { source: '/logo.png', headers: staticAssetHeaders },

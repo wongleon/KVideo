@@ -250,19 +250,32 @@ interface DoubanFeedProps {
 }
 
 function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
-  // 首帧直接使用缓存数据，切回首页时不出现加载态闪烁
-  const initialCache = useMemo(() => readFirstPageCache(queries), [queries]);
-  const [movies, setMovies] = useState<DoubanMovie[]>(initialCache?.movies ?? []);
-  const [loading, setLoading] = useState(!initialCache);
+  const [movies, setMovies] = useState<DoubanMovie[]>([]);
+  const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
 
   useEffect(() => {
-    const cached = readFirstPageCache(queries);
-    // 命中且未过期：直接复用，不再请求
-    if (cached && !cached.stale) return;
-
     let cancelled = false;
+    // 缓存只能在挂载后恢复：服务端渲染拿不到客户端缓存，首帧就用缓存会导致 hydration 不一致
+    const cached = readFirstPageCache(queries);
+
+    if (cached) {
+      // 放到微任务中恢复，避免 effect 内同步 setState 触发级联渲染
+      void Promise.resolve().then(() => {
+        if (cancelled) return;
+        setMovies(cached.movies);
+        setHasMore(true);
+        setLoading(false);
+      });
+
+      // 命中且未过期：直接复用，不再请求
+      if (!cached.stale) {
+        return () => {
+          cancelled = true;
+        };
+      }
+    }
 
     fetchDoubanPage(queries, 0).then((list) => {
       if (cancelled) return;
@@ -315,10 +328,8 @@ interface PopularFeaturesProps {
 }
 
 export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesProps) {
-  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张（优先复用缓存）
-  const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>(
-    () => readCarouselCache()?.movies ?? []
-  );
+  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张
+  const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>([]);
 
   const activeFilter = useMemo(
     () => HOME_FILTERS.find((filter) => filter.id === selectedFilterId) ?? HOME_FILTERS[0],
@@ -333,11 +344,23 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
 
   // 首屏并行拉取四个分类，各取列表第一张组成轮播图
   useEffect(() => {
-    const cached = readCarouselCache();
-    // 命中且未过期：直接复用，不再请求
-    if (cached && !cached.stale) return;
-
     let cancelled = false;
+    const cached = readCarouselCache();
+
+    if (cached) {
+      // 放到微任务中恢复，避免 effect 内同步 setState 触发级联渲染
+      void Promise.resolve().then(() => {
+        if (cancelled) return;
+        setCarouselMovies(cached.movies);
+      });
+
+      // 命中且未过期：直接复用，不再请求
+      if (!cached.stale) {
+        return () => {
+          cancelled = true;
+        };
+      }
+    }
 
     // 「最新电影」不在轮播图里，但其余标签的数据在推荐与轮播阶段其实都已请求过，
     // 只有它要等用户切换时才首次请求，容易撞上豆瓣冷请求的抖动而暂时查不到。

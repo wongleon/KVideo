@@ -8,10 +8,12 @@
  * 这里的策略：
  * - 导航请求：缓存优先，命中后立即返回外壳，同时后台静默更新（下次启动即为最新版本）
  * - 带 hash 的构建产物（JS/CSS/字体/图片）：缓存优先，无需重复下载
- * - /api 请求：完全不接管，保证数据新鲜
+ * - 豆瓣海报代理：缓存优先，图片 URL 与内容一一对应，避免重建元素时重新下载
+ * - 其余 /api 请求：完全不接管，保证数据新鲜
  */
 
-const CACHE_VERSION = 'v1';
+// v2：清掉旧版外壳缓存，避免 PWA 冷启动继续命中旧 HTML（其引用的构建产物可能已失效）
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `kvideo-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `kvideo-asset-${CACHE_VERSION}`;
 
@@ -39,22 +41,27 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches
-            .keys()
-            .then((cacheNames) =>
-                Promise.all(
-                    cacheNames
-                        .filter((cacheName) => {
-                            if (cacheName === SHELL_CACHE || cacheName === ASSET_CACHE) return false;
-                            return (
-                                cacheName.startsWith('kvideo-') ||
-                                LEGACY_CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix))
-                            );
-                        })
-                        .map((cacheName) => caches.delete(cacheName))
-                )
-            )
-            .then(() => self.clients.claim())
+        caches.keys().then(async (cacheNames) => {
+            const staleCacheNames = cacheNames.filter((cacheName) => {
+                if (cacheName === SHELL_CACHE || cacheName === ASSET_CACHE) return false;
+                return (
+                    cacheName.startsWith('kvideo-') ||
+                    LEGACY_CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix))
+                );
+            });
+
+            await Promise.all(staleCacheNames.map((cacheName) => caches.delete(cacheName)));
+            await self.clients.claim();
+
+            // 旧缓存被清理说明站点已重新构建，当前页面可能还停在旧 HTML 上（其引用的产物已失效，
+            // 表现为一直加载不出来）。这里主动重载受控页面，交给新缓存的外壳重新渲染。
+            if (staleCacheNames.length > 0) {
+                const clients = await self.clients.matchAll({ type: 'window' });
+                await Promise.all(
+                    clients.map((client) => client.navigate(client.url).catch(() => undefined))
+                );
+            }
+        })
     );
 });
 
