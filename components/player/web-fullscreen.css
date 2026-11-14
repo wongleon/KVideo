@@ -15,6 +15,9 @@
     align-items: center !important;
     justify-content: center !important;
     --kvideo-web-scale: 1;
+    /* 舞台比例默认 16:9，运行时由播放器按视频真实分辨率注入 */
+    --kvideo-stage-aspect: 1.7778;
+    --kvideo-stage-aspect-inverse: 0.5625;
 }
 
 .kvideo-container.is-web-fullscreen.top-align-stage {
@@ -22,10 +25,11 @@
     padding-top: calc(env(safe-area-inset-top, 0px) + clamp(0px, 1.5vh, 16px)) !important;
 }
 
+/* 舞台按视频真实比例适配视口（contain），不裁切画面 */
 .kvideo-container.is-web-fullscreen .kvideo-web-fullscreen-stage {
     position: relative !important;
-    width: min(calc(var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) * var(--kvideo-web-scale)), calc(var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) * var(--kvideo-web-scale) * 16 / 9)) !important;
-    height: min(calc(var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) * var(--kvideo-web-scale)), calc(var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) * var(--kvideo-web-scale) * 9 / 16)) !important;
+    width: min(calc(var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) * var(--kvideo-web-scale)), calc(var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) * var(--kvideo-web-scale) * var(--kvideo-stage-aspect, 1.7778))) !important;
+    height: min(calc(var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) * var(--kvideo-web-scale)), calc(var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) * var(--kvideo-web-scale) * var(--kvideo-stage-aspect-inverse, 0.5625))) !important;
     max-width: var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) !important;
     max-height: var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) !important;
 }
@@ -35,20 +39,6 @@
     width: 100% !important;
     height: 100% !important;
     border-radius: 0 !important;
-}
-
-/* 「铺满」档位：横向铺满窗口且高度不出屏，画面按比例裁切上下（仅宽屏窗口生效） */
-@media (min-aspect-ratio: 16/9) {
-    .kvideo-container.is-web-fullscreen.web-size-full .kvideo-web-fullscreen-stage {
-        width: var(--kvideo-stage-viewport-width, var(--kvideo-viewport-width, 100vw)) !important;
-        height: var(--kvideo-stage-viewport-height, var(--kvideo-viewport-height, 100vh)) !important;
-        max-width: none !important;
-        max-height: none !important;
-    }
-
-    .kvideo-container.is-web-fullscreen.web-size-full video {
-        object-fit: cover !important;
-    }
 }
 
 /* Force Landscape Mode for Mobile (iOS mainly) */

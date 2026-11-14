@@ -108,6 +108,13 @@ export function DesktopVideoPlayer({
   // Detect actual video resolution
   const videoResolution = useVideoResolution(refs.videoRef);
 
+  // 网页全屏舞台的宽高比跟随视频真实比例，未就绪时回退 16:9
+  const stageAspect = React.useMemo(() => {
+    const width = videoResolution?.width ?? 0;
+    const height = videoResolution?.height ?? 0;
+    return width > 0 && height > 0 ? width / height : 16 / 9;
+  }, [videoResolution]);
+
   // Notify parent when resolution is detected
   React.useEffect(() => {
     if (videoResolution && onResolutionDetected) {
@@ -291,8 +298,10 @@ export function DesktopVideoPlayer({
       ['--kvideo-stage-viewport-width' as string]: `${stageWidth}px`,
       ['--kvideo-stage-viewport-height' as string]: `${stageHeight}px`,
       ['--kvideo-web-scale' as string]: WEB_FULLSCREEN_SCALE[webFullscreenSize].toString(),
+      ['--kvideo-stage-aspect' as string]: stageAspect.toString(),
+      ['--kvideo-stage-aspect-inverse' as string]: (1 / stageAspect).toString(),
     };
-  }, [data.fullscreenMode, shouldForceLandscape, viewportMetrics, webFullscreenSize]);
+  }, [data.fullscreenMode, shouldForceLandscape, viewportMetrics, webFullscreenSize, stageAspect]);
 
   const shouldHideCursor = shouldHidePlayerCursor({
     isFullscreen: data.isFullscreen,
