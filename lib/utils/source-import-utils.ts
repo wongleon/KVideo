@@ -117,7 +117,8 @@ export async function fetchSourcesFromUrl(url: string): Promise<ImportResult> {
             throw directError;
         }
 
-        response = await fetch(`/api/proxy?url=${encodeURIComponent(url)}`, {
+        // 订阅只拉取 JSON 配置，改走专用端点；托管部署下 /api/proxy 是关闭的
+        response = await fetch(`/api/subscription?url=${encodeURIComponent(url)}`, {
             headers,
         });
     }
