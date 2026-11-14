@@ -42,7 +42,11 @@ function scoreLocationMismatch(block: Block, mainPattern: MainPattern): number {
     const allPathsMismatch = locations.every(location => (
         location.pathPrefix !== mainPattern.pathPrefix
     ));
-    if (allPathsMismatch) return 5;
+    // 路径前缀不一致属于「弱证据」：正常的多 CDN 轮转内容同样会命中，
+    // 若单条就达到 heuristic 阈值（5 分），会造成整块误删并在时间轴留下空洞。
+    // 降到 3.5 后仍需叠加关键词、命名或时长异常才会删除；
+    // aggressive 模式阈值是 3 分，这条规则仍可单独触发，激进过滤不受影响。
+    if (allPathsMismatch) return 3.5;
 
     const allOriginsMismatch = locations.every(location => (
         Boolean(mainPattern.origin && location.origin) && location.origin !== mainPattern.origin

@@ -59,3 +59,46 @@ test('off mode returns the original playlist byte-for-byte', () => {
 
   assert.equal(filterM3u8Ad(playlist, 'https://cdn.example.com/index.m3u8', 'off'), playlist);
 });
+
+test('removing an ad block also removes its BYTERANGE and PROGRAM-DATE-TIME lines', () => {
+  const lines = ['#EXTM3U', '#EXT-X-VERSION:4'];
+  addBlock(lines, [6, 6, 6, 6], 'https://media.example.com', 'main-a');
+
+  lines.push('#EXT-X-DISCONTINUITY');
+  [0, 1].forEach((index) => {
+    lines.push('#EXTINF:6.000,');
+    lines.push(`#EXT-X-PROGRAM-DATE-TIME:2024-01-01T00:00:0${index}.000Z`);
+    lines.push(`#EXT-X-BYTERANGE:1000@${index * 1000}`);
+    lines.push(`https://ads.example.net/content/ad-${index}.ts`);
+  });
+
+  addBlock(lines, [6, 6], 'https://media.example.com', 'main-b');
+
+  const filtered = filterM3u8Ad(lines.join('\n'), 'https://media.example.com/content/index.m3u8');
+
+  assert.equal(filtered.includes('ads.example.net'), false);
+  // 残留的 BYTERANGE / PROGRAM-DATE-TIME 会被错配到下一个分片
+  assert.equal(filtered.includes('#EXT-X-BYTERANGE'), false);
+  assert.equal(filtered.includes('#EXT-X-PROGRAM-DATE-TIME'), false);
+  assert.equal(filtered.includes('/main-a-0.ts'), true);
+  assert.equal(filtered.includes('/main-b-1.ts'), true);
+});
+
+test('a path-only mismatch no longer removes a content block on its own', () => {
+  const lines = ['#EXTM3U'];
+  addBlock(lines, [6, 6, 6, 6], 'https://cdn.example.com', 'main-a');
+
+  // 同 CDN 的另一个目录：只有路径前缀不同，命名与时长都正常（多 CDN 轮转的典型形态）
+  lines.push('#EXT-X-DISCONTINUITY');
+  [0, 1].forEach((index) => {
+    lines.push('#EXTINF:6.000,');
+    lines.push(`https://cdn.example.com/backup/main-a-${index}.ts`);
+  });
+
+  addBlock(lines, [6, 6], 'https://cdn.example.com', 'main-b');
+
+  const filtered = filterM3u8Ad(lines.join('\n'), 'https://cdn.example.com/content/index.m3u8');
+
+  assert.equal(filtered.includes('/backup/main-a-0.ts'), true);
+  assert.equal(filtered.includes('/main-a-0.ts'), true);
+});

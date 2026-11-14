@@ -44,12 +44,24 @@ export function parseBlocks(lines: string[]): Block[] {
 
         const durationMatch = line.match(/#EXTINF:([\d.]+)/);
         const duration = durationMatch ? Number.parseFloat(durationMatch[1]) : 0;
-        const url = lines[index + 1]?.trim();
+
+        // #EXTINF 与分片 URI 之间允许出现 #EXT-X-BYTERANGE / #EXT-X-PROGRAM-DATE-TIME
+        // 等标签；只看下一行会把这类分片整段漏掉，导致广告过滤对其完全不生效。
+        let urlIndex = index + 1;
+        while (urlIndex < lines.length) {
+            const candidate = lines[urlIndex].trim();
+            if (!candidate || candidate === '#EXT-X-DISCONTINUITY') break;
+            if (!candidate.startsWith('#')) break;
+            if (candidate.startsWith('#EXTINF:')) break;
+            urlIndex += 1;
+        }
+
+        const url = lines[urlIndex]?.trim();
         if (url && !url.startsWith('#')) {
             currentBlock.segments.push({
                 url,
                 duration,
-                lineIndex: index + 1,
+                lineIndex: urlIndex,
             });
         }
     }

@@ -36,6 +36,17 @@ const SEGMENT_METADATA_PREFIXES = [
     '#EXT-X-PROGRAM-DATE-TIME:',
 ];
 
+/**
+ * 分片「自带」的元数据标签。
+ * 与 SEGMENT_METADATA_PREFIXES 的区别：这里刻意不含 #EXT-X-DISCONTINUITY，
+ * 因为它是块分隔符，删除分片时必须保留，否则会把两段不同来源的内容当成连续时间轴。
+ */
+const SEGMENT_OWNED_METADATA_PREFIXES = [
+    '#EXTINF:',
+    '#EXT-X-BYTERANGE:',
+    '#EXT-X-PROGRAM-DATE-TIME:',
+];
+
 function normalizeKeywords(keywords: string[]): string[] {
     return [...new Set(
         keywords
@@ -66,6 +77,48 @@ function isInterstitialDateRange(trimmedLine: string, normalizedKeywords: string
 function isAuxiliaryAdMetadataLine(trimmedLine: string, normalizedKeywords: string[]): boolean {
     return AUXILIARY_AD_TAG_PREFIXES.some((prefix) => trimmedLine.startsWith(prefix)) ||
         (trimmedLine.startsWith('#EXT-X-DATERANGE:') && hasKeywordMatch(trimmedLine, normalizedKeywords));
+}
+
+/**
+ * 把「删除分片」扩展为「删除该分片自带的元数据行」。
+ *
+ * 一个分片在 m3u8 里通常由以下几行组成：
+ *   #EXTINF:6.006,
+ *   #EXT-X-BYTERANGE:1234@0            （可选）
+ *   #EXT-X-PROGRAM-DATE-TIME:...       （可选）
+ *   segment.ts
+ *
+ * 如果只删 URI 和 EXTINF，残留的 BYTERANGE 会被挂到下一个分片上，
+ * 让播放器按错误的字节偏移读取一个完整分片，解析失败后触发重试；
+ * 残留的 PROGRAM-DATE-TIME 也会让后续时间戳错乱。
+ */
+function expandRemovalToOwnedMetadata(
+    lines: string[],
+    segmentLineIndices: number[],
+    adLineIndices: Set<number>,
+): void {
+    const sorted = [...segmentLineIndices].sort((a, b) => a - b);
+
+    for (let index = 0; index < sorted.length; index += 1) {
+        const lineIndex = sorted[index];
+        if (!adLineIndices.has(lineIndex)) continue;
+
+        // 上界为上一个分片的 URI 行，避免把别人的元数据一起删掉
+        const lowerBound = index > 0 ? sorted[index - 1] + 1 : 0;
+
+        for (let cursor = lineIndex - 1; cursor >= lowerBound; cursor -= 1) {
+            const trimmed = lines[cursor]?.trim() ?? '';
+            if (!trimmed) {
+                adLineIndices.add(cursor);
+                continue;
+            }
+            if (SEGMENT_OWNED_METADATA_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) {
+                adLineIndices.add(cursor);
+                continue;
+            }
+            break;
+        }
+    }
 }
 
 /**
@@ -135,10 +188,9 @@ export function filterM3u8Ad(
                 const threshold = mode === 'aggressive' ? 3.0 : 5.0;
 
                 if (shouldFilterBlock(score, threshold)) {
-                    // Mark all lines in this block for removal
+                    // 这里只标记分片 URI，自带的元数据行在循环结束后统一补齐
                     for (const segment of block.segments) {
                         adLineIndices.add(segment.lineIndex);
-                        adLineIndices.add(segment.lineIndex - 1); // EXTINF line
                     }
                 } else if (block.segments.length > 0) {
                     // Segment-level detection:
@@ -155,11 +207,20 @@ export function filterM3u8Ad(
                         // Higher threshold for individual segments to avoid false positives
                         if (segmentScore >= 4.0) {
                             adLineIndices.add(segment.lineIndex);
-                            adLineIndices.add(segment.lineIndex - 1);
                         }
                     }
                 }
             }
+
+            // 分片 URI 标记完成后，把分片自带的 EXTINF / BYTERANGE /
+            // PROGRAM-DATE-TIME 一并删除，避免残留标签错配到下一个分片
+            const segmentLineIndices: number[] = [];
+            for (const block of blocks) {
+                for (const segment of block.segments) {
+                    segmentLineIndices.push(segment.lineIndex);
+                }
+            }
+            expandRemovalToOwnedMetadata(lines, segmentLineIndices, adLineIndices);
         }
     }
 
