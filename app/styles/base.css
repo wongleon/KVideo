@@ -128,11 +128,8 @@ nav:where(.sticky, .fixed),
     animation: fadeInUp 0.2s ease-out;
 }
 
-@supports (content-visibility: auto) {
-    img {
-        content-visibility: auto;
-    }
-}
+/* 注意：不要给 img 设置 content-visibility。替换元素加上后会跳过内容渲染，
+   与原生 lazy 加载叠加时，滚动新增的图片可能被判定为不可见而始终不加载。 */
 
 img {
     transform: translateZ(0);

@@ -40,8 +40,7 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
       className="group block cursor-pointer md:hover:translate-y-[-2px] transition-transform duration-200 ease-out"
       style={{
         position: 'relative',
-        zIndex: 1,
-        contentVisibility: 'auto'
+        zIndex: 1
       }}
       onMouseEnter={(e) => (e.currentTarget.style.zIndex = '2')}
       onMouseLeave={(e) => (e.currentTarget.style.zIndex = '1')}
