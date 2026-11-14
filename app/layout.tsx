@@ -188,8 +188,8 @@ export default async function RootLayout({
           className="sr-only"
         />
 
-        {/* Google Cast SDK */}
-        <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" async />
+        {/* Google Cast SDK 改为播放器按需加载（见 useCastControls）：
+            脚本来自 www.gstatic.com，国内网络不可达，放根布局会拖慢所有页面的加载完成时间 */}
 
         {/* Scroll Performance Optimization Script */}
         <script
