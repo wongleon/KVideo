@@ -95,12 +95,20 @@ const CAROUSEL_FILTERS = HOME_FILTERS.filter(
   (filter) => filter.id !== 'recommend' && filter.id !== 'new-movie'
 );
 
+interface DoubanPageResult {
+  movies: DoubanMovie[];
+  /** 至少一路取满一页，说明后面可能还有数据 */
+  hasMore: boolean;
+  /** 所有查询都失败（超时/5xx），属于暂时性问题，不能当作「没有更多」 */
+  temporaryFailure: boolean;
+}
+
 /** 拉取一页豆瓣数据，多路查询交错合并并去重 */
 async function fetchDoubanPage(
   queries: DoubanQuery[],
   pageNumber: number,
   allowRetry = true
-): Promise<DoubanMovie[]> {
+): Promise<DoubanPageResult> {
   const pageStart = pageNumber * PAGE_LIMIT;
 
   const results = await Promise.all(
@@ -109,22 +117,25 @@ async function fetchDoubanPage(
         const response = await fetch(
           `/api/douban/recommend?type=${query.type}&tag=${encodeURIComponent(query.tag)}&page_limit=${PAGE_LIMIT}&page_start=${pageStart}`
         );
-        if (!response.ok) return [] as DoubanMovie[];
+        if (!response.ok) {
+          return { subjects: [] as DoubanMovie[], failed: true, full: false };
+        }
         const data = await response.json();
-        return (data.subjects || []) as DoubanMovie[];
+        const subjects = (data.subjects || []) as DoubanMovie[];
+        return { subjects, failed: false, full: subjects.length >= PAGE_LIMIT };
       } catch {
-        return [] as DoubanMovie[];
+        return { subjects: [] as DoubanMovie[], failed: true, full: false };
       }
     })
   );
 
   const merged: DoubanMovie[] = [];
   const seen = new Set<string>();
-  const maxLength = results.reduce((max, list) => Math.max(max, list.length), 0);
+  const maxLength = results.reduce((max, result) => Math.max(max, result.subjects.length), 0);
 
   for (let index = 0; index < maxLength; index += 1) {
-    for (const list of results) {
-      const movie = list[index];
+    for (const result of results) {
+      const movie = result.subjects[index];
       if (!movie || seen.has(movie.id)) continue;
       seen.add(movie.id);
       merged.push(movie);
@@ -138,7 +149,12 @@ async function fetchDoubanPage(
     return fetchDoubanPage(queries, pageNumber, false);
   }
 
-  return merged;
+  return {
+    movies: merged,
+    hasMore: results.some((result) => result.full),
+    // 一路成功一路失败时仍按成功处理，只有全部失败才算暂时性故障
+    temporaryFailure: results.every((result) => result.failed),
+  };
 }
 
 interface HomeFilterTabsProps {
@@ -249,11 +265,21 @@ interface DoubanFeedProps {
   onMovieClick: (movie: DoubanMovie) => void;
 }
 
+/** 连续失败后的自动重试次数上限，超过后等待用户再次滚动触发 */
+const MAX_AUTO_RETRIES = 3;
+/** 自动重试的基础退避时间，按失败次数递增 */
+const RETRY_BASE_DELAY = 3000;
+
 function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
   const [movies, setMovies] = useState<DoubanMovie[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  // 待重试的页码，非空时由下方 effect 安排退避重试
+  const [retryPage, setRetryPage] = useState<number | null>(null);
+  const inFlightRef = useRef(false);
+  const failedCountRef = useRef(0);
+  const cooldownUntilRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,12 +303,16 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
       }
     }
 
-    fetchDoubanPage(queries, 0).then((list) => {
+    fetchDoubanPage(queries, 0).then((result) => {
       if (cancelled) return;
-      setMovies(list);
-      setHasMore(list.length > 0);
       setLoading(false);
-      writeFirstPageCache(queries, list);
+
+      // 暂时性失败（超时/5xx）时保留已有内容，不清空
+      if (result.temporaryFailure) return;
+
+      setMovies(result.movies);
+      setHasMore(result.hasMore);
+      writeFirstPageCache(queries, result.movies);
     });
 
     return () => {
@@ -291,17 +321,56 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
   }, [queries]);
 
   const loadMore = useCallback(async (nextPage: number) => {
-    setLoading(true);
-    const list = await fetchDoubanPage(queries, nextPage);
+    // 防重入：加载中或处于失败冷却期时忽略观察器重建带来的重复触发
+    if (inFlightRef.current || Date.now() < cooldownUntilRef.current) return;
 
+    inFlightRef.current = true;
+    setLoading(true);
+
+    let result: DoubanPageResult | null = null;
+    try {
+      result = await fetchDoubanPage(queries, nextPage);
+    } finally {
+      inFlightRef.current = false;
+      setLoading(false);
+    }
+
+    if (!result) return;
+
+    if (result.temporaryFailure) {
+      failedCountRef.current += 1;
+      // 失败不推进分页、不结束信息流：保持 hasMore 不变，退避后自动重试
+      cooldownUntilRef.current =
+        Date.now() + RETRY_BASE_DELAY * Math.min(failedCountRef.current, MAX_AUTO_RETRIES);
+
+      if (failedCountRef.current <= MAX_AUTO_RETRIES) {
+        setRetryPage(nextPage);
+      }
+      return;
+    }
+
+    failedCountRef.current = 0;
+    setRetryPage(null);
     setMovies((prev) => {
       const seen = new Set(prev.map((movie) => movie.id));
-      return [...prev, ...list.filter((movie) => !seen.has(movie.id))];
+      return [...prev, ...result.movies.filter((movie) => !seen.has(movie.id))];
     });
     setPage(nextPage);
-    setHasMore(list.length > 0);
-    setLoading(false);
+    setHasMore(result.hasMore);
   }, [queries]);
+
+  // 失败后的指数退避重试
+  useEffect(() => {
+    if (retryPage === null) return;
+
+    const delayMs = RETRY_BASE_DELAY * failedCountRef.current;
+    const timer = setTimeout(() => {
+      setRetryPage(null);
+      void loadMore(retryPage);
+    }, delayMs);
+
+    return () => clearTimeout(timer);
+  }, [retryPage, loadMore]);
 
   const { prefetchRef, loadMoreRef } = useInfiniteScroll({
     hasMore,
@@ -367,27 +436,27 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
     // 这里首屏预热一次（结果不入轮播），切换该标签时可直接命中缓存。
     const latestFilter = HOME_FILTERS.find((filter) => filter.id === 'new-movie');
     if (latestFilter && !readFirstPageCache(latestFilter.queries)) {
-      void fetchDoubanPage(latestFilter.queries, 0, false).then((list) => {
-        writeFirstPageCache(latestFilter.queries, list);
+      void fetchDoubanPage(latestFilter.queries, 0, false).then((result) => {
+        writeFirstPageCache(latestFilter.queries, result.movies);
       });
     }
 
-    Promise.all(CAROUSEL_FILTERS.map((filter) => fetchDoubanPage(filter.queries, 0))).then((lists) => {
+    Promise.all(CAROUSEL_FILTERS.map((filter) => fetchDoubanPage(filter.queries, 0))).then((results) => {
       if (cancelled) return;
 
       const picks: DoubanMovie[] = [];
       const seen = new Set<string>();
 
-      lists.forEach((list) => {
-        const movie = list[0];
+      results.forEach((result) => {
+        const movie = result.movies[0];
         if (!movie || seen.has(movie.id)) return;
         seen.add(movie.id);
         picks.push(movie);
       });
 
       // 轮播依赖的四个分类数据同时写入首屏缓存，切换标签时可直接复用
-      lists.forEach((list, index) => {
-        writeFirstPageCache(CAROUSEL_FILTERS[index].queries, list);
+      results.forEach((result, index) => {
+        writeFirstPageCache(CAROUSEL_FILTERS[index].queries, result.movies);
       });
 
       setCarouselMovies(picks);

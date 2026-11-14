@@ -2,6 +2,48 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
+/** 单次上游请求超时：豆瓣在部分边缘节点会挂起数十秒，缩短超时后重试，避免整页长时间等待 */
+const UPSTREAM_TIMEOUT_MS = 4000;
+/** 上游最多尝试次数（含首次） */
+const MAX_ATTEMPTS = 2;
+/** 两次尝试之间的间隔 */
+const RETRY_DELAY_MS = 400;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 请求豆瓣接口：网络异常与 5xx 视为暂时性失败，重试一次 */
+async function fetchUpstream(url: string): Promise<Response> {
+  let lastError: unknown = new Error('Douban API request failed');
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'Referer': 'https://movie.douban.com/',
+        },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+      });
+
+      if (response.status >= 500 && attempt < MAX_ATTEMPTS) {
+        await delay(RETRY_DELAY_MS);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt < MAX_ATTEMPTS) {
+        await delay(RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const tag = searchParams.get('tag') || '热门';
@@ -12,18 +54,9 @@ export async function GET(request: Request) {
   try {
     const url = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(tag)}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`;
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Referer': 'https://movie.douban.com/',
-      },
-      // 豆瓣上游在部分边缘节点会挂起数十秒，超时后快速失败，避免首页内容长时间空白
-      signal: AbortSignal.timeout(8000),
-      // Cloudflare 边缘缓存上游响应（Node 自托管会忽略该字段）。
-      // next.revalidate 依赖 Vercel 的 ISR，在 Pages/Workers 运行时不会生效。
-      // TTL 不宜过长：豆瓣偶发限流会返回空列表，过长缓存会让该标签长时间查不到内容
-      cf: { cacheEverything: true, cacheTtl: 300 },
-    } as RequestInit & { cf: { cacheEverything: boolean; cacheTtl: number } });
+    // 不再使用 cf.cacheEverything：同一上游 URL 的请求在边缘节点合并后，
+    // 一次挂起会把后续同 URL 请求一起拖到超时，反而放大了故障
+    const response = await fetchUpstream(url);
 
     if (!response.ok) {
       throw new Error(`Douban API returned ${response.status}`);
@@ -58,9 +91,13 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Douban API error:', error);
+    // 503 + retryable：与「确实没有数据」区分开，前端据此保留分页状态并在稍后重试
     return NextResponse.json(
-      { subjects: [], error: 'Failed to fetch recommendations' },
-      { status: 500, headers: { 'Cache-Control': 'no-store' } }
+      { subjects: [], error: 'Failed to fetch recommendations', retryable: true },
+      {
+        status: 503,
+        headers: { 'Cache-Control': 'no-store', 'Retry-After': '5' },
+      }
     );
   }
 }
