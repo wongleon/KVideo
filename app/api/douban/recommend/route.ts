@@ -17,8 +17,12 @@ export async function GET(request: Request) {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         'Referer': 'https://movie.douban.com/',
       },
-      next: { revalidate: 86400 }, // 查询结果缓存 1 天
-    });
+      // 豆瓣上游在部分边缘节点会挂起数十秒，超时后快速失败，避免首页内容长时间空白
+      signal: AbortSignal.timeout(8000),
+      // Cloudflare 边缘缓存上游响应（Node 自托管会忽略该字段）。
+      // next.revalidate 依赖 Vercel 的 ISR，在 Pages/Workers 运行时不会生效。
+      cf: { cacheEverything: true, cacheTtl: 86400 },
+    } as RequestInit & { cf: { cacheEverything: boolean; cacheTtl: number } });
 
     if (!response.ok) {
       throw new Error(`Douban API returned ${response.status}`);
@@ -37,9 +41,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(data, {
       headers: {
-        // 允许 CDN 缓存以提升首屏速度；同时声明 query 参与缓存键，
+        // 允许 CDN 与浏览器缓存以提升首屏速度；同时声明 query 参与缓存键，
         // 避免不同标签共用同一份缓存导致数据串位
-        'Cache-Control': 'public, max-age=0, s-maxage=86400, stale-while-revalidate=3600',
+        'Cache-Control': 'public, max-age=300, s-maxage=86400, stale-while-revalidate=3600',
         'Netlify-Vary': 'query',
       },
     });
