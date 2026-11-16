@@ -40,12 +40,18 @@ function getEdgeCache(): Cache | null {
 
 export async function GET(request: Request) {
     const cache = getEdgeCache();
+    // 诊断用：hit 命中边缘缓存、miss 已回源、off 运行时未提供 Cache API
+    const cacheState = cache ? 'miss' : 'off';
 
     // 命中边缘缓存直接返回，不再回源；任何缓存异常都退化为直接回源
     if (cache) {
         try {
             const cached = await cache.match(request);
-            if (cached) return cached;
+            if (cached) {
+                const headers = new Headers(cached.headers);
+                headers.set('X-Image-Cache', 'hit');
+                return new Response(cached.body, { status: cached.status, headers });
+            }
         } catch {
             // 忽略，走正常回源流程
         }
@@ -72,7 +78,10 @@ export async function GET(request: Request) {
             imageResponse = await fetch(candidate, {
                 headers: REQUEST_HEADERS,
                 signal: AbortSignal.timeout(Math.min(PER_CANDIDATE_TIMEOUT_MS, remaining)),
-            });
+                // 让 Cloudflare 直接缓存豆瓣图片本体：图片内容不会变化，
+                // 命中后同一数据中心的后续请求不再跨网回源（Cache API 不可用时的兜底）
+                cf: { cacheEverything: true, cacheTtl: 2592000 },
+            } as RequestInit & { cf: { cacheEverything: boolean; cacheTtl: number } });
         } catch {
             // 线路不可达或超时,换下一个镜像
             continue;
@@ -118,6 +127,7 @@ export async function GET(request: Request) {
         const headers = new Headers();
         headers.set('Content-Type', upstreamType);
         headers.set('Content-Length', String(bytes.byteLength));
+        headers.set('X-Image-Cache', cacheState);
         // 边缘缓存 30 天、浏览器 1 天：即使上游某天返回了异常内容，客户端也能较快自我恢复
         headers.set('Cache-Control', 'public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400');
         // Netlify 缓存 edge function 响应时默认不把 query 计入缓存键，
