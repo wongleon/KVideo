@@ -42,18 +42,21 @@ export async function GET(request: Request) {
     const cache = getEdgeCache();
     // 诊断用：hit 命中边缘缓存、miss 已回源、off 运行时未提供 Cache API
     const cacheState = cache ? 'miss' : 'off';
+    // 用独立的 GET 请求作为缓存键：Next 包装过的请求对象不适合直接交给 Cache API
+    const cacheKey = new Request(request.url, { method: 'GET' });
 
     // 命中边缘缓存直接返回，不再回源；任何缓存异常都退化为直接回源
     if (cache) {
         try {
-            const cached = await cache.match(request);
+            const cached = await cache.match(cacheKey);
             if (cached) {
                 const headers = new Headers(cached.headers);
                 headers.set('X-Image-Cache', 'hit');
                 return new Response(cached.body, { status: cached.status, headers });
             }
-        } catch {
+        } catch (error) {
             // 忽略，走正常回源流程
+            console.error('[DoubanImage] cache.match failed:', error);
         }
     }
 
@@ -143,9 +146,14 @@ export async function GET(request: Request) {
             // 首次回源后写入边缘缓存，后续同节点的请求直接命中。
             // 写入失败不影响本次响应，只会在下次请求时再回源一次。
             try {
-                await cache.put(request, response.clone());
-            } catch {
-                // 忽略缓存写入失败（如客户端提前断开）
+                await cache.put(cacheKey, response.clone());
+                response.headers.set('X-Image-Cache-Put', 'ok');
+            } catch (error) {
+                // 把失败原因透出到响应头，便于线上确认 Cache API 是否可用
+                response.headers.set(
+                    'X-Image-Cache-Put',
+                    error instanceof Error ? error.message.slice(0, 80) : 'failed',
+                );
             }
         }
 
