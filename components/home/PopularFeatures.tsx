@@ -1,13 +1,13 @@
 /**
  * PopularFeatures - 首页豆瓣推荐区
- * 固定筛选：推荐（电影+剧集混合）、热门电影、最新电影、热门剧集、热门综艺、热门美剧
+ * 固定筛选：推荐（电影+剧集混合）、电影、国产剧、综艺、美剧
  */
 
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MovieGrid } from './MovieGrid';
-import { RecommendCarousel } from './RecommendCarousel';
+import { FeaturedMovieCard } from './FeaturedMovieCard';
 import { useInfiniteScroll } from '@/lib/hooks/useInfiniteScroll';
 
 interface DoubanMovie {
@@ -18,9 +18,14 @@ interface DoubanMovie {
   url: string;
 }
 
+/** 豆瓣排序方式：recommend 综合热度、time 最新、rank 评分优先 */
+type DoubanSort = 'recommend' | 'time' | 'rank';
+
 interface DoubanQuery {
   type: 'movie' | 'tv';
   tag: string;
+  /** 缺省时按豆瓣默认的综合热度排序 */
+  sort?: DoubanSort;
 }
 
 interface HomeFilter {
@@ -34,16 +39,17 @@ export const HOME_FILTERS: HomeFilter[] = [
   {
     id: 'recommend',
     label: '推荐',
+    // 电影侧按评分优先（热门池内的高分片），剧集侧按最新（剧集 rank 会穿透到经典老剧），
+    // 两路各自按评分排序后交错合并，兼顾高分内容与电影/剧集混排
     queries: [
-      { type: 'movie', tag: '热门' },
-      { type: 'tv', tag: '热门' },
+      { type: 'movie', tag: '热门', sort: 'rank' },
+      { type: 'tv', tag: '热门', sort: 'time' },
     ],
   },
-  { id: 'movie', label: '热门电影', queries: [{ type: 'movie', tag: '热门' }] },
-  { id: 'new-movie', label: '最新电影', queries: [{ type: 'movie', tag: '最新' }] },
-  { id: 'tv', label: '热门剧集', queries: [{ type: 'tv', tag: '热门' }] },
-  { id: 'variety', label: '热门综艺', queries: [{ type: 'tv', tag: '综艺' }] },
-  { id: 'us-tv', label: '热门美剧', queries: [{ type: 'tv', tag: '美剧' }] },
+  { id: 'movie', label: '电影', queries: [{ type: 'movie', tag: '最新' }] },
+  { id: 'tv', label: '国产剧', queries: [{ type: 'tv', tag: '国产剧' }] },
+  { id: 'variety', label: '综艺', queries: [{ type: 'tv', tag: '综艺' }] },
+  { id: 'us-tv', label: '美剧', queries: [{ type: 'tv', tag: '美剧' }] },
 ];
 
 const PAGE_LIMIT = 20;
@@ -61,10 +67,12 @@ interface CachedFeed {
  * 放在模块作用域可以在同一次会话内跨路由保留，切回首页时立即渲染，无需重新加载。
  */
 const firstPageCache = new Map<string, CachedFeed>();
-let carouselCache: CachedFeed | null = null;
 
 function getQueryKey(queries: DoubanQuery[]): string {
-  return queries.map((query) => `${query.type}:${query.tag}`).join('|');
+  // sort 必须参与缓存键，否则同一标签不同排序会共用缓存导致内容串位
+  return queries
+    .map((query) => `${query.type}:${query.tag}:${query.sort ?? 'recommend'}`)
+    .join('|');
 }
 
 /** 读取首屏缓存，stale 表示已过期（仍可先展示，再静默刷新） */
@@ -79,21 +87,6 @@ function writeFirstPageCache(queries: DoubanQuery[], movies: DoubanMovie[]): voi
   if (movies.length === 0) return;
   firstPageCache.set(getQueryKey(queries), { movies, timestamp: Date.now() });
 }
-
-function readCarouselCache(): (CachedFeed & { stale: boolean }) | null {
-  if (!carouselCache) return null;
-  return { ...carouselCache, stale: Date.now() - carouselCache.timestamp > FEED_CACHE_TTL };
-}
-
-function writeCarouselCache(movies: DoubanMovie[]): void {
-  if (movies.length === 0) return;
-  carouselCache = { movies, timestamp: Date.now() };
-}
-
-/** 轮播图取图来源：热门电影、热门剧集、热门综艺、热门美剧各取一张（推荐与最新电影不参与） */
-const CAROUSEL_FILTERS = HOME_FILTERS.filter(
-  (filter) => filter.id !== 'recommend' && filter.id !== 'new-movie'
-);
 
 interface DoubanPageResult {
   movies: DoubanMovie[];
@@ -115,7 +108,7 @@ async function fetchDoubanPage(
     queries.map(async (query) => {
       try {
         const response = await fetch(
-          `/api/douban/recommend?type=${query.type}&tag=${encodeURIComponent(query.tag)}&page_limit=${PAGE_LIMIT}&page_start=${pageStart}`
+          `/api/douban/recommend?type=${query.type}&tag=${encodeURIComponent(query.tag)}&sort=${query.sort ?? 'recommend'}&page_limit=${PAGE_LIMIT}&page_start=${pageStart}`
         );
         if (!response.ok) {
           return { subjects: [] as DoubanMovie[], failed: true, full: false };
@@ -131,6 +124,17 @@ async function fetchDoubanPage(
 
   const merged: DoubanMovie[] = [];
   const seen = new Set<string>();
+
+  // 多路混合（如「推荐」）：每路内部先按评分降序（暂无评分的置后），再交错合并。
+  // 这样既保持电影/剧集交替出现的节奏，又让高分内容优先展示；
+  // 若整体排序，剧集侧大量无评分的新剧会被全部压到底部，导致「推荐」变成纯电影列表。
+  // 单标签不排序，保持接口自身的排序语义（如「电影」按时间）。
+  if (queries.length > 1) {
+    for (const result of results) {
+      result.subjects.sort((a, b) => (parseFloat(b.rate) || 0) - (parseFloat(a.rate) || 0));
+    }
+  }
+
   const maxLength = results.reduce((max, result) => Math.max(max, result.subjects.length), 0);
 
   for (let index = 0; index < maxLength; index += 1) {
@@ -393,14 +397,22 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
   });
 
   return (
-    <MovieGrid
-      movies={movies}
-      loading={loading}
-      hasMore={hasMore}
-      onMovieClick={onMovieClick}
-      prefetchRef={prefetchRef}
-      loadMoreRef={loadMoreRef}
-    />
+    <>
+      {/* 当前标签的第一条以横向大卡片展示，切换标签时随之更新 */}
+      {movies.length > 0 && (
+        <FeaturedMovieCard movie={movies[0]} onMovieClick={onMovieClick} />
+      )}
+
+      <MovieGrid
+        // 第一条已在顶部横向卡片展示，列表从第二条开始，避免重复
+        movies={movies.slice(1)}
+        loading={loading}
+        hasMore={hasMore}
+        onMovieClick={onMovieClick}
+        prefetchRef={prefetchRef}
+        loadMoreRef={loadMoreRef}
+      />
+    </>
   );
 }
 
@@ -410,9 +422,6 @@ interface PopularFeaturesProps {
 }
 
 export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesProps) {
-  // 轮播图数据：热门电影 / 热门剧集 / 热门综艺 / 热门美剧 各取一张
-  const [carouselMovies, setCarouselMovies] = useState<DoubanMovie[]>([]);
-
   const activeFilter = useMemo(
     () => HOME_FILTERS.find((filter) => filter.id === selectedFilterId) ?? HOME_FILTERS[0],
     [selectedFilterId]
@@ -424,70 +433,8 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
     }
   }, [onSearch]);
 
-  // 首屏并行拉取四个分类，各取列表第一张组成轮播图
-  useEffect(() => {
-    let cancelled = false;
-    const cached = readCarouselCache();
-
-    if (cached) {
-      // 放到微任务中恢复，避免 effect 内同步 setState 触发级联渲染
-      void Promise.resolve().then(() => {
-        if (cancelled) return;
-        setCarouselMovies(cached.movies);
-      });
-
-      // 命中且未过期：直接复用，不再请求
-      if (!cached.stale) {
-        return () => {
-          cancelled = true;
-        };
-      }
-    }
-
-    // 「最新电影」不在轮播图里，但其余标签的数据在推荐与轮播阶段其实都已请求过，
-    // 只有它要等用户切换时才首次请求，容易撞上豆瓣冷请求的抖动而暂时查不到。
-    // 这里首屏预热一次（结果不入轮播），切换该标签时可直接命中缓存。
-    const latestFilter = HOME_FILTERS.find((filter) => filter.id === 'new-movie');
-    if (latestFilter && !readFirstPageCache(latestFilter.queries)) {
-      void fetchDoubanPage(latestFilter.queries, 0, false).then((result) => {
-        writeFirstPageCache(latestFilter.queries, result.movies);
-      });
-    }
-
-    Promise.all(CAROUSEL_FILTERS.map((filter) => fetchDoubanPage(filter.queries, 0))).then((results) => {
-      if (cancelled) return;
-
-      const picks: DoubanMovie[] = [];
-      const seen = new Set<string>();
-
-      results.forEach((result) => {
-        const movie = result.movies[0];
-        if (!movie || seen.has(movie.id)) return;
-        seen.add(movie.id);
-        picks.push(movie);
-      });
-
-      // 轮播依赖的四个分类数据同时写入首屏缓存，切换标签时可直接复用
-      results.forEach((result, index) => {
-        writeFirstPageCache(CAROUSEL_FILTERS[index].queries, result.movies);
-      });
-
-      setCarouselMovies(picks);
-      writeCarouselCache(picks);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
     <div className="animate-fade-in">
-      {/* 推荐轮播图：切换标签时始终保留 */}
-      {carouselMovies.length > 0 && (
-        <RecommendCarousel movies={carouselMovies} onMovieClick={handleMovieClick} />
-      )}
-
       <DoubanFeed
         key={activeFilter.id}
         queries={activeFilter.queries}

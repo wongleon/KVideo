@@ -8,6 +8,8 @@ const UPSTREAM_TIMEOUT_MS = 4000;
 const MAX_ATTEMPTS = 2;
 /** 两次尝试之间的间隔 */
 const RETRY_DELAY_MS = 400;
+/** 豆瓣支持的排序方式：recommend 综合热度、time 最新、rank 评分优先 */
+const ALLOWED_SORTS = new Set(['recommend', 'time', 'rank']);
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,9 +55,12 @@ export async function GET(request: Request) {
   const pageLimit = searchParams.get('page_limit') || '20';
   const pageStart = searchParams.get('page_start') || '0';
   const type = searchParams.get('type') || 'movie'; // movie or tv
+  // 白名单校验：豆瓣对无效 sort 会返回空数组，不能把任意值透传给上游
+  const sortParam = searchParams.get('sort') || 'recommend';
+  const sort = ALLOWED_SORTS.has(sortParam) ? sortParam : 'recommend';
 
   try {
-    const url = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(tag)}&sort=recommend&page_limit=${pageLimit}&page_start=${pageStart}`;
+    const url = `https://movie.douban.com/j/search_subjects?type=${type}&tag=${encodeURIComponent(tag)}&sort=${sort}&page_limit=${pageLimit}&page_start=${pageStart}`;
 
     const response = await fetchUpstream(url);
 
