@@ -5,6 +5,7 @@ const DOUBAN_IMAGE_HOSTS = [
   'img9.doubanio.com',
   'img3.doubanio.com',
   'img2.doubanio.com',
+  'img1.doubanio.com',
 ];
 
 export function buildDoubanImageCandidates(rawUrl: string): string[] {
