@@ -97,7 +97,7 @@ function writeFirstPageCache(queries: DoubanQuery[], movies: DoubanMovie[]): voi
 
 interface DoubanPageResult {
   movies: DoubanMovie[];
-  /** 至少一路取满一页，说明后面可能还有数据 */
+  /** 至少一路返回了非空数据，说明后面可能还有内容；以出现空页作为真正的结束信号 */
   hasMore: boolean;
   /** 所有查询都失败（超时/5xx），属于暂时性问题，不能当作「没有更多」 */
   temporaryFailure: boolean;
@@ -138,7 +138,9 @@ async function fetchDoubanPageInternal(
         }
         const data = await response.json();
         const subjects = (data.subjects || []) as DoubanMovie[];
-        return { subjects, failed: false, full: subjects.length >= PAGE_LIMIT };
+        // 豆瓣分页条数不固定（偶发只回 19 条），不能以「满页」判断是否还有下一页：
+        // 只要本次还有数据就继续翻，真正结束以返回空页为准，避免短页被当成末页而卡住。
+        return { subjects, failed: false, full: subjects.length > 0 };
       } catch {
         return { subjects: [] as DoubanMovie[], failed: true, full: false };
       }
