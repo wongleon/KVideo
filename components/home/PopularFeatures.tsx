@@ -68,6 +68,13 @@ interface CachedFeed {
  */
 const firstPageCache = new Map<string, CachedFeed>();
 
+/**
+ * 进行中的分页请求。
+ * 相同查询、相同页码并发发起时复用同一个 Promise，避免重复回源：
+ * 开发模式下 effect 会执行两次、首屏预热与用户滚动也可能同时请求同一页。
+ */
+const inFlightPages = new Map<string, Promise<DoubanPageResult>>();
+
 function getQueryKey(queries: DoubanQuery[]): string {
   // sort 必须参与缓存键，否则同一标签不同排序会共用缓存导致内容串位
   return queries
@@ -101,6 +108,22 @@ async function fetchDoubanPage(
   queries: DoubanQuery[],
   pageNumber: number,
   allowRetry = true
+): Promise<DoubanPageResult> {
+  const requestKey = `${getQueryKey(queries)}|${pageNumber}`;
+  const existing = inFlightPages.get(requestKey);
+  if (existing) return existing;
+
+  const pending = fetchDoubanPageInternal(queries, pageNumber, allowRetry).finally(() => {
+    inFlightPages.delete(requestKey);
+  });
+  inFlightPages.set(requestKey, pending);
+  return pending;
+}
+
+async function fetchDoubanPageInternal(
+  queries: DoubanQuery[],
+  pageNumber: number,
+  allowRetry: boolean
 ): Promise<DoubanPageResult> {
   const pageStart = pageNumber * PAGE_LIMIT;
 
@@ -150,7 +173,7 @@ async function fetchDoubanPage(
   // 避免刚切到该标签就误显示「暂无内容」
   if (merged.length === 0 && allowRetry && pageNumber === 0) {
     await new Promise((resolve) => setTimeout(resolve, 600));
-    return fetchDoubanPage(queries, pageNumber, false);
+    return fetchDoubanPageInternal(queries, pageNumber, false);
   }
 
   return {
@@ -333,6 +356,16 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
       setMovies(result.movies);
       setHasMore(result.hasMore);
       writeFirstPageCache(queries, result.movies);
+
+      // 首屏渲染完成后静默预热第二页：国内直连 Cloudflare 时链路不稳，
+      // 第二页冷请求要回源豆瓣、耗时更长，更容易失败；提前预热可让 CDN 缓存好，
+      // 用户滚动时直接命中。与用户滚动触发的请求会被 inFlightPages 合并，不会重复回源。
+      if (result.hasMore) {
+        setTimeout(() => {
+          if (cancelled) return;
+          void fetchDoubanPage(queries, 1).catch(() => undefined);
+        }, 1500);
+      }
     });
 
     return () => {
