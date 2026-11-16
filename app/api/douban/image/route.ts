@@ -7,6 +7,12 @@ export const runtime = 'edge';
 const PER_CANDIDATE_TIMEOUT_MS = 3000;
 /** 整张图的拉取总预算：镜像串行重试不能无限叠加，超预算直接返回错误，避免拖死整页 */
 const TOTAL_BUDGET_MS = 8000;
+/**
+ * 有效图片的最小体积。
+ * 豆瓣在图片失效或被限流时会返回 200 的 "image not available" 占位图（约 3-6KB），
+ * 正常海报均在 15KB 以上；低于该阈值的响应必须当作失败处理，且绝不能写入任何缓存。
+ */
+const MIN_VALID_IMAGE_BYTES = 8000;
 
 const REQUEST_HEADERS = {
     'User-Agent':
@@ -22,18 +28,27 @@ const REQUEST_HEADERS = {
  * 本地 Node 环境没有全局 caches，返回 null 时退化为不缓存。
  */
 function getEdgeCache(): Cache | null {
-    // Cloudflare 的 caches.default 不在 DOM 标准类型里，这里用结构化类型读取
-    const cacheStorage = (globalThis as { caches?: { default?: Cache } }).caches;
-    return cacheStorage?.default ?? null;
+    try {
+        // Cloudflare 的 caches.default 不在 DOM 标准类型里，这里用结构化类型读取
+        const cacheStorage = (globalThis as { caches?: { default?: Cache } }).caches;
+        return cacheStorage?.default ?? null;
+    } catch {
+        // 运行时未提供 Cache API 时退化为不缓存，不能让图片请求因此失败
+        return null;
+    }
 }
 
 export async function GET(request: Request) {
     const cache = getEdgeCache();
 
-    // 命中边缘缓存直接返回，不再回源
+    // 命中边缘缓存直接返回，不再回源；任何缓存异常都退化为直接回源
     if (cache) {
-        const cached = await cache.match(request);
-        if (cached) return cached;
+        try {
+            const cached = await cache.match(request);
+            if (cached) return cached;
+        } catch {
+            // 忽略，走正常回源流程
+        }
     }
 
     const { searchParams } = new URL(request.url);
@@ -75,18 +90,41 @@ export async function GET(request: Request) {
             continue;
         }
 
-        const headers = new Headers();
-        const contentType = imageResponse.headers.get('content-type');
-        if (contentType) {
-            headers.set('Content-Type', contentType);
+        // 上游返回非图片内容（如被拦截后回吐 HTML）同样不可用
+        const upstreamType = imageResponse.headers.get('content-type') || '';
+        if (!upstreamType.startsWith('image/')) {
+            lastStatus = 502;
+            lastError = `Unexpected content type: ${upstreamType || 'unknown'}`;
+            continue;
         }
-        // URL 中的 ?url= 指向固定图片且带 v=2 版本号，内容不会变化，可长期缓存
-        headers.set('Cache-Control', 'public, max-age=15724800, s-maxage=15724800, immutable');
+
+        let bytes: ArrayBuffer;
+        try {
+            bytes = await imageResponse.arrayBuffer();
+        } catch {
+            lastStatus = 502;
+            lastError = 'Failed to read image body';
+            continue;
+        }
+
+        // 占位图是内容层面的问题，换镜像也拿不到真图，直接失败且不缓存
+        if (bytes.byteLength < MIN_VALID_IMAGE_BYTES) {
+            return NextResponse.json(
+                { error: 'Upstream returned placeholder image' },
+                { status: 502, headers: { 'Cache-Control': 'no-store' } }
+            );
+        }
+
+        const headers = new Headers();
+        headers.set('Content-Type', upstreamType);
+        headers.set('Content-Length', String(bytes.byteLength));
+        // 边缘缓存 30 天、浏览器 1 天：即使上游某天返回了异常内容，客户端也能较快自我恢复
+        headers.set('Cache-Control', 'public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400');
         // Netlify 缓存 edge function 响应时默认不把 query 计入缓存键，
         // 不声明按 url 变化会导致所有海报命中同一份缓存（全站显示同一张图）。
         headers.set('Netlify-Vary', 'query=url');
 
-        const response = new Response(imageResponse.body, {
+        const response = new Response(bytes, {
             status: 200,
             headers,
         });
@@ -104,5 +142,6 @@ export async function GET(request: Request) {
         return response;
     }
 
-    return NextResponse.json({ error: lastError }, { status: lastStatus });
+    // 失败响应一律不可缓存，避免错误状态被浏览器或 Service Worker 记住
+    return NextResponse.json({ error: lastError }, { status: lastStatus, headers: { 'Cache-Control': 'no-store' } });
 }

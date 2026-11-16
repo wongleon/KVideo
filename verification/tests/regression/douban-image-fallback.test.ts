@@ -28,6 +28,7 @@ test('non-Douban and malformed URLs are attempted only once', () => {
 
 test('image proxy falls back after a mirror network failure', async (context) => {
   const requested: string[] = [];
+  const validImage = 'x'.repeat(9000);
 
   context.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
     const url = input.toString();
@@ -37,7 +38,7 @@ test('image proxy falls back after a mirror network failure', async (context) =>
       throw new TypeError('fetch failed');
     }
 
-    return new Response('image-bytes', {
+    return new Response(validImage, {
       status: 200,
       headers: { 'content-type': 'image/webp' },
     });
@@ -48,9 +49,25 @@ test('image proxy falls back after a mirror network failure', async (context) =>
 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('content-type'), 'image/webp');
-  assert.equal(await response.text(), 'image-bytes');
+  assert.equal((await response.text()).length, validImage.length);
   assert.deepEqual(requested, [
     'https://img1.doubanio.com/poster.webp',
     'https://img9.doubanio.com/poster.webp',
   ]);
+});
+
+test('placeholder image from upstream is rejected and never cached', async (context) => {
+  context.mock.method(globalThis, 'fetch', async () =>
+    new Response('x'.repeat(100), {
+      status: 200,
+      headers: { 'content-type': 'image/jpeg' },
+    }),
+  );
+
+  const target = encodeURIComponent('https://img3.doubanio.com/poster.jpg');
+  const response = await GET(new Request(`https://kvideo.test/api/douban/image?url=${target}`));
+
+  // 豆瓣占位图体积过小，必须按失败处理，且响应不可缓存免得错误内容长期固化
+  assert.equal(response.status, 502);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
 });

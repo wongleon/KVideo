@@ -12,8 +12,8 @@
  * - 其余 /api 请求：完全不接管，保证数据新鲜
  */
 
-// v2：清掉旧版外壳缓存，避免 PWA 冷启动继续命中旧 HTML（其引用的构建产物可能已失效）
-const CACHE_VERSION = 'v2';
+// v3：升级缓存版本，让历史缓存中的豆瓣占位图（image not available）整体作废
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = `kvideo-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `kvideo-asset-${CACHE_VERSION}`;
 
@@ -25,6 +25,13 @@ const PRECACHE_URLS = ['/', '/manifest.json', '/apple-touch-icon.png', '/icon.pn
 
 /** 可以长期缓存的请求类型（构建产物文件名带 hash，内容不会原地变化） */
 const CACHEABLE_DESTINATIONS = new Set(['script', 'style', 'font', 'image']);
+
+/**
+ * 有效图片的最小体积。
+ * 豆瓣占位图（image not available）约 3-6KB，正常海报在 15KB 以上，
+ * 低于该阈值的图片不写入缓存，避免错误内容长期固化、之后无法自我恢复。
+ */
+const MIN_VALID_IMAGE_BYTES = 8000;
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -118,7 +125,15 @@ async function handleAsset(event) {
     }
 
     const response = await fetch(request);
-    if (response.ok) {
+
+    // 图片体积异常（多为豆瓣占位图）说明内容不可用，不写入缓存，下次仍会重试
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    const isSuspiciousImage =
+        request.destination === 'image' &&
+        contentLength > 0 &&
+        contentLength < MIN_VALID_IMAGE_BYTES;
+
+    if (response.ok && !isSuspiciousImage) {
         cache.put(request, response.clone()).catch(() => {});
     }
 

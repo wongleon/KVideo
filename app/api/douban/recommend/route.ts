@@ -76,10 +76,11 @@ export async function GET(request: Request) {
     if (hasSubjects) {
       data.subjects = subjects.map((item: Record<string, unknown>) => ({
         ...item,
-        // v=2 用于绕过此前被错误缓存（同一张图）的浏览器缓存
+        // v=3：绕过历史缓存。旧版本会在豆瓣返回占位图时把错误内容缓存数月，
+        // 升级版本号可让 Service Worker、浏览器和边缘缓存同时换用新的缓存键，立即生效。
         cover:
           typeof item.cover === 'string'
-            ? `/api/douban/image?v=2&url=${encodeURIComponent(item.cover)}`
+            ? `/api/douban/image?v=3&url=${encodeURIComponent(item.cover)}`
             : item.cover,
       }));
     }
