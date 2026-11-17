@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MovieGrid } from './MovieGrid';
 import { FeaturedMovieCard } from './FeaturedMovieCard';
+import { ShortDramaFeed } from './ShortDramaFeed';
 import { useInfiniteScroll } from '@/lib/hooks/useInfiniteScroll';
 
 interface DoubanMovie {
@@ -31,6 +32,8 @@ interface DoubanQuery {
 interface HomeFilter {
   id: string;
   label: string;
+  /** 数据来源：缺省为豆瓣推荐，short-drama / ai-comic 走量子资源的对应分类 */
+  source?: 'douban' | 'short-drama' | 'ai-comic';
   queries: DoubanQuery[];
 }
 
@@ -46,10 +49,24 @@ export const HOME_FILTERS: HomeFilter[] = [
       { type: 'tv', tag: '热门', sort: 'time' },
     ],
   },
-  { id: 'movie', label: '电影', queries: [{ type: 'movie', tag: '最新' }] },
   { id: 'tv', label: '国产剧', queries: [{ type: 'tv', tag: '国产剧' }] },
-  { id: 'variety', label: '综艺', queries: [{ type: 'tv', tag: '综艺' }] },
+  { id: 'movie', label: '电影', queries: [{ type: 'movie', tag: '最新' }] },
   { id: 'us-tv', label: '美剧', queries: [{ type: 'tv', tag: '美剧' }] },
+  { id: 'variety', label: '综艺', queries: [{ type: 'tv', tag: '综艺' }] },
+  {
+    id: 'short-drama',
+    label: '短剧',
+    source: 'short-drama',
+    // 短剧不在豆瓣收录范围内，改由采集站「短剧」分类提供，见 /api/short-drama
+    queries: [],
+  },
+  {
+    id: 'ai-comic',
+    label: 'AI漫剧',
+    source: 'ai-comic',
+    // 量子资源把 AI 生成短剧单独放在「AI漫剧」分类，与真人短剧分开
+    queries: [],
+  },
 ];
 
 const PAGE_LIMIT = 20;
@@ -468,13 +485,26 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
     }
   }, [onSearch]);
 
+  const shortDramaCategory =
+    activeFilter.source === 'short-drama' || activeFilter.source === 'ai-comic'
+      ? activeFilter.source
+      : null;
+
   return (
     <div className="animate-fade-in">
-      <DoubanFeed
-        key={activeFilter.id}
-        queries={activeFilter.queries}
-        onMovieClick={handleMovieClick}
-      />
+      {shortDramaCategory ? (
+        <ShortDramaFeed
+          key={activeFilter.id}
+          category={shortDramaCategory}
+          onMovieClick={handleMovieClick}
+        />
+      ) : (
+        <DoubanFeed
+          key={activeFilter.id}
+          queries={activeFilter.queries}
+          onMovieClick={handleMovieClick}
+        />
+      )}
     </div>
   );
 }

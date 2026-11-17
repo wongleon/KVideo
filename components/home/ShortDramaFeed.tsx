@@ -1,0 +1,154 @@
+/**
+ * ShortDramaFeed - 首页短剧信息流
+ * 数据来自量子资源的短剧 / AI漫剧分类（后端见 /api/short-drama），卡片与分页交互与豆瓣信息流保持一致
+ */
+
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { useInfiniteScroll } from '@/lib/hooks/useInfiniteScroll';
+import { FeaturedMovieCard } from './FeaturedMovieCard';
+import { MovieGrid } from './MovieGrid';
+
+export interface ShortDramaMovie {
+  id: string;
+  title: string;
+  cover: string;
+  rate: string;
+  url: string;
+}
+
+/** 数据分类：真人短剧 / AI 生成短剧 */
+export type ShortDramaCategory = 'short-drama' | 'ai-comic';
+
+/** 首屏缓存有效期：切回短剧标签时直接复用，避免重复回源 */
+const FIRST_PAGE_CACHE_TTL = 10 * 60 * 1000;
+
+/** 模块级缓存：路由切换会卸载组件，放在模块作用域可在同一次会话内保留首屏数据 */
+const firstPageCache = new Map<ShortDramaCategory, { movies: ShortDramaMovie[]; timestamp: number }>();
+
+interface PageResult {
+  movies: ShortDramaMovie[];
+  hasMore: boolean;
+}
+
+/** 请求一页短剧数据，page 从 1 开始（后端页码） */
+async function fetchShortDramaPage(category: ShortDramaCategory, page: number): Promise<PageResult> {
+  const response = await fetch(`/api/short-drama?category=${category}&page=${page}`);
+  if (!response.ok) throw new Error('Failed to fetch short drama');
+
+  const data = await response.json();
+  const movies = Array.isArray(data.subjects) ? (data.subjects as ShortDramaMovie[]) : [];
+  return { movies, hasMore: Boolean(data.hasMore) };
+}
+
+interface ShortDramaFeedProps {
+  category: ShortDramaCategory;
+  onMovieClick: (movie: ShortDramaMovie) => void;
+}
+
+export function ShortDramaFeed({ category, onMovieClick }: ShortDramaFeedProps) {
+  const [movies, setMovies] = useState<ShortDramaMovie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const inFlightRef = useRef(false);
+  // 首屏只加载一次：开发模式下 effect 会执行两次，避免重复回源
+  const firstLoadStartedRef = useRef(false);
+
+  /** 加载首屏：命中缓存时先渲染缓存，否则回源请求第一页 */
+  const loadFirstPage = useCallback(async () => {
+    setFailed(false);
+
+    const cached = firstPageCache.get(category);
+    if (cached && Date.now() - cached.timestamp < FIRST_PAGE_CACHE_TTL) {
+      setMovies(cached.movies);
+      setHasMore(true);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await fetchShortDramaPage(category, 1);
+      setMovies(result.movies);
+      setHasMore(result.hasMore);
+      // 空结果多为采集站瞬时异常，不写入缓存，避免整个会话持续空白
+      if (result.movies.length > 0) {
+        firstPageCache.set(category, { movies: result.movies, timestamp: Date.now() });
+      }
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [category]);
+
+  useEffect(() => {
+    if (firstLoadStartedRef.current) return;
+    firstLoadStartedRef.current = true;
+
+    // 缓存恢复放到微任务，避免 effect 内同步 setState 触发级联渲染
+    void Promise.resolve().then(loadFirstPage);
+  }, [loadFirstPage]);
+
+  const loadMore = useCallback(async (nextPage: number) => {
+    if (inFlightRef.current) return;
+
+    inFlightRef.current = true;
+    setLoading(true);
+    try {
+      const result = await fetchShortDramaPage(category, nextPage + 1);
+      setMovies((prev) => {
+        const seen = new Set(prev.map((movie) => movie.id));
+        return [...prev, ...result.movies.filter((movie) => !seen.has(movie.id))];
+      });
+      setPage(nextPage);
+      setHasMore(result.hasMore);
+    } catch {
+      // 分页失败时停止继续加载，避免观察器反复触发同一页
+      setHasMore(false);
+    } finally {
+      inFlightRef.current = false;
+      setLoading(false);
+    }
+  }, [category]);
+
+  const { prefetchRef, loadMoreRef } = useInfiniteScroll({
+    hasMore,
+    loading,
+    page,
+    onLoadMore: loadMore,
+  });
+
+  if (failed && movies.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-[var(--text-color-secondary)] mb-4">短剧加载失败，请稍后重试</p>
+        <Button variant="secondary" onClick={() => void loadFirstPage()}>
+          重新加载
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* 首条以横向大卡片展示，与豆瓣信息流的视觉节奏保持一致 */}
+      {movies.length > 0 && (
+        <FeaturedMovieCard movie={movies[0]} onMovieClick={onMovieClick} />
+      )}
+
+      <MovieGrid
+        movies={movies.slice(1)}
+        loading={loading}
+        hasMore={hasMore}
+        onMovieClick={onMovieClick}
+        prefetchRef={prefetchRef}
+        loadMoreRef={loadMoreRef}
+      />
+    </>
+  );
+}
