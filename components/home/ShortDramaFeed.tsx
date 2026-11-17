@@ -1,6 +1,7 @@
 /**
- * ShortDramaFeed - 首页短剧信息流
- * 数据来自量子资源的短剧 / AI漫剧分类（后端见 /api/short-drama），卡片与分页交互与豆瓣信息流保持一致
+ * ShortDramaFeed - 首页采集站分类信息流
+ * 覆盖短剧 / AI漫剧 / 国漫，数据来自量子资源的对应分类（后端见 /api/short-drama），
+ * 卡片与分页交互与豆瓣信息流保持一致
  */
 
 'use client';
@@ -19,8 +20,8 @@ export interface ShortDramaMovie {
   url: string;
 }
 
-/** 数据分类：真人短剧 / AI 生成短剧 */
-export type ShortDramaCategory = 'short-drama' | 'ai-comic';
+/** 数据分类：真人短剧 / AI 生成短剧 / 国产动漫 */
+export type ShortDramaCategory = 'short-drama' | 'ai-comic' | 'guoman';
 
 /** 首屏缓存有效期：切回短剧标签时直接复用，避免重复回源 */
 const FIRST_PAGE_CACHE_TTL = 10 * 60 * 1000;

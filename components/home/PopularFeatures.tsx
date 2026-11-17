@@ -32,8 +32,8 @@ interface DoubanQuery {
 interface HomeFilter {
   id: string;
   label: string;
-  /** 数据来源：缺省为豆瓣推荐，short-drama / ai-comic 走量子资源的对应分类 */
-  source?: 'douban' | 'short-drama' | 'ai-comic';
+  /** 数据来源：缺省为豆瓣推荐，short-drama / ai-comic / guoman 走量子资源的对应分类 */
+  source?: 'douban' | 'short-drama' | 'ai-comic' | 'guoman';
   queries: DoubanQuery[];
 }
 
@@ -52,6 +52,13 @@ export const HOME_FILTERS: HomeFilter[] = [
   { id: 'tv', label: '国产剧', queries: [{ type: 'tv', tag: '国产剧' }] },
   { id: 'movie', label: '电影', queries: [{ type: 'movie', tag: '最新' }] },
   { id: 'us-tv', label: '美剧', queries: [{ type: 'tv', tag: '美剧' }] },
+  {
+    id: 'guoman',
+    label: '国漫',
+    source: 'guoman',
+    // 国漫对应量子资源的「国产动漫」分类
+    queries: [],
+  },
   { id: 'variety', label: '综艺', queries: [{ type: 'tv', tag: '综艺' }] },
   {
     id: 'short-drama',
@@ -486,7 +493,9 @@ export function PopularFeatures({ onSearch, selectedFilterId }: PopularFeaturesP
   }, [onSearch]);
 
   const shortDramaCategory =
-    activeFilter.source === 'short-drama' || activeFilter.source === 'ai-comic'
+    activeFilter.source === 'short-drama' ||
+    activeFilter.source === 'ai-comic' ||
+    activeFilter.source === 'guoman'
       ? activeFilter.source
       : null;
 

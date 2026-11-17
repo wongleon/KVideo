@@ -6,12 +6,14 @@ export const runtime = 'edge';
 const SOURCE_URL = 'https://cj.lziapi.com/api.php/provide/vod/';
 
 /**
- * 首页支持的短剧分类：量子资源把真人短剧与 AI 生成短剧拆成两个独立分类。
+ * 首页支持的采集站分类：短剧与 AI 漫剧是量子资源的独立分类，
+ * 国漫对应「国产动漫」，三者共用同一套列表 / 分页 / 缓存逻辑。
  * type_id 在上游调整分类时可能变化，首页为空时会按 match 正则重新探测兜底。
  */
 const CATEGORY_CONFIG = {
   'short-drama': { typeId: '46', match: /短剧|微短/ },
   'ai-comic': { typeId: '52', match: /AI\s*漫剧|AI\s*短剧|漫剧/i },
+  guoman: { typeId: '29', match: /国产动漫|国漫/ },
 } as const;
 
 type ShortDramaCategory = keyof typeof CATEGORY_CONFIG;
@@ -92,7 +94,7 @@ async function detectTypeId(match: RegExp): Promise<string | null> {
 
 /** 只接受已知分类，其余参数一律回落到真人短剧 */
 function resolveCategory(value: string | null): ShortDramaCategory {
-  return value === 'ai-comic' ? 'ai-comic' : 'short-drama';
+  return value === 'ai-comic' || value === 'guoman' ? value : 'short-drama';
 }
 
 export async function GET(request: Request) {
