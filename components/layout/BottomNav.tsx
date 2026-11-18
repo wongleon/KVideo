@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 /**
  * 底部悬浮导航栏
@@ -72,14 +72,59 @@ function normalizePath(pathname: string | null): string {
 
 export function BottomNav() {
     const currentPath = normalizePath(usePathname());
-    const activeIndex = NAV_ITEMS.findIndex((item) => item.href === currentPath);
+    const router = useRouter();
     // 首帧禁用过渡，避免滑动高亮从第一个位置“飞”到当前页
     const [mounted, setMounted] = useState(false);
+    // 点击后立即移动高亮：PWA 从后台恢复时目标页面的 RSC 需要重新请求，
+    // 若等高亮跟随 pathname，点击后会有数秒“没有反应”的错觉
+    const [pendingPath, setPendingPath] = useState<string | null>(null);
+
+    const activePath = pendingPath && pendingPath !== currentPath ? pendingPath : currentPath;
+    const activeIndex = NAV_ITEMS.findIndex((item) => item.href === activePath);
 
     useEffect(() => {
         const raf = requestAnimationFrame(() => setMounted(true));
         return () => cancelAnimationFrame(raf);
     }, []);
+
+    // 导航失败时兜底复位点击意图，避免高亮长期停在错误的项上
+    useEffect(() => {
+        if (!pendingPath || pendingPath === currentPath) return;
+        const timer = setTimeout(() => setPendingPath(null), 8000);
+        return () => clearTimeout(timer);
+    }, [pendingPath, currentPath]);
+
+    // PWA 从后台恢复时，客户端路由缓存可能已被系统回收，切回首页要重新请求 RSC。
+    // 在页面重新可见时提前预取其余底栏页面，用户点击时通常已经拿到数据。
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        const prefetchOthers = () => {
+            if (document.visibilityState !== 'visible') return;
+            if (timer) clearTimeout(timer);
+            // 稍作延迟，等系统恢复网络栈后再发起，避免恢复瞬间的请求全部失败
+            timer = setTimeout(() => {
+                NAV_ITEMS.forEach(({ href }) => {
+                    if (href === currentPath) return;
+                    try {
+                        router.prefetch(href);
+                    } catch {
+                        // 预取失败不影响点击时的正常导航
+                    }
+                });
+            }, 300);
+        };
+
+        prefetchOthers();
+        document.addEventListener('visibilitychange', prefetchOthers);
+        window.addEventListener('pageshow', prefetchOthers);
+
+        return () => {
+            if (timer) clearTimeout(timer);
+            document.removeEventListener('visibilitychange', prefetchOthers);
+            window.removeEventListener('pageshow', prefetchOthers);
+        };
+    }, [currentPath, router]);
 
     // 仅在导航栏包含的页面中展示
     if (!VISIBLE_PATHS.includes(currentPath)) {
@@ -119,7 +164,7 @@ export function BottomNav() {
                 />
 
                 {NAV_ITEMS.map(({ href, label, Icon }) => {
-                    const isActive = currentPath === href;
+                    const isActive = activePath === href;
 
                     return (
                         <Link
@@ -128,6 +173,20 @@ export function BottomNav() {
                             aria-label={label}
                             aria-current={isActive ? 'page' : undefined}
                             data-focusable
+                            onClick={(event) => {
+                                // 只处理普通左键点击：新窗口/新标签打开时不改变当前页高亮
+                                if (
+                                    event.defaultPrevented ||
+                                    event.button !== 0 ||
+                                    event.metaKey ||
+                                    event.ctrlKey ||
+                                    event.shiftKey ||
+                                    event.altKey
+                                ) {
+                                    return;
+                                }
+                                if (href !== currentPath) setPendingPath(href);
+                            }}
                             className={`relative z-10 flex flex-col items-center justify-center rounded-[22px] cursor-pointer transition-colors duration-300 ${
                                 isActive
                                     ? 'text-[var(--accent-color)]'
