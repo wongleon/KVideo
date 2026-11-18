@@ -8,6 +8,7 @@ import { Icons } from '@/components/ui/Icon';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
 import { getSourceName } from '@/lib/utils/source-names';
 import { storeGroupedSources } from '@/lib/utils/grouped-sources-cache';
+import { buildPosterUrl } from '@/lib/utils/poster-url';
 import type { FavoriteItem, VideoHistoryItem } from '@/lib/types';
 
 interface FavoritesItemProps {
@@ -103,7 +104,7 @@ export function FavoritesItem({ item, historyItem, onRemove, isPremium = false }
                     <div className="relative w-16 self-stretch flex-shrink-0 bg-[var(--glass-bg)] overflow-hidden">
                         {item.poster ? (
                             <img
-                                src={item.poster}
+                                src={buildPosterUrl(item.poster)}
                                 alt={item.title}
                                 className="absolute inset-0 w-full h-full object-cover"
                                 referrerPolicy="no-referrer"

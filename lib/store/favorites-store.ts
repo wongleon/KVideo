@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { FavoriteItem } from '@/lib/types';
+import { evictPosterCache, schedulePosterCacheGc } from '@/lib/utils/poster-url';
 import { profiledKey } from '@/lib/utils/profile-storage';
 
 const MAX_FAVORITES = 100;
@@ -68,16 +69,26 @@ const createFavoritesStore = (name: string) =>
 
                         return { favorites: newFavorites };
                     });
+
+                    // 记录变化后回收不再被引用的海报缓存（内部已做合并与节流）
+                    schedulePosterCacheGc();
                 },
 
                 removeFavorite: (videoId, source) => {
                     const favoriteId = generateFavoriteId(videoId, source);
+                    const target = get().favorites.find(
+                        (fav) => generateFavoriteId(fav.videoId, fav.source) === favoriteId
+                    );
+
+                    // 取消收藏时同步清理该海报的图片缓存
+                    if (target) evictPosterCache(target.poster);
 
                     set((state) => ({
                         favorites: state.favorites.filter(
                             (fav) => generateFavoriteId(fav.videoId, fav.source) !== favoriteId
                         ),
                     }));
+                    schedulePosterCacheGc();
                 },
 
                 toggleFavorite: (item) => {
@@ -105,11 +116,15 @@ const createFavoritesStore = (name: string) =>
                 },
 
                 clearFavorites: () => {
+                    // 清空收藏时一并释放海报图片缓存
+                    get().favorites.forEach((fav) => evictPosterCache(fav.poster));
                     set({ favorites: [] });
+                    schedulePosterCacheGc();
                 },
 
                 importFavorites: (favorites) => {
                     set({ favorites });
+                    schedulePosterCacheGc();
                 },
             }),
             {

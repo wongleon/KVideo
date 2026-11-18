@@ -4,6 +4,7 @@
 
 
 import { Icons } from '@/components/ui/Icon';
+import { buildPosterUrl } from '@/lib/utils/poster-url';
 
 interface PosterImageProps {
     poster?: string;
@@ -16,7 +17,7 @@ export function PosterImage({ poster, title, progress }: PosterImageProps) {
         <div className="relative w-16 self-stretch flex-shrink-0 bg-[var(--glass-bg)] overflow-hidden">
             {poster ? (
                 <img
-                    src={poster}
+                    src={buildPosterUrl(poster)}
                     alt={title}
                     className="absolute inset-0 w-full h-full object-cover"
                     onError={(e) => {

@@ -27,6 +27,12 @@ const PRECACHE_URLS = ['/', '/manifest.json', '/apple-touch-icon.png', '/icon.pn
 const CACHEABLE_DESTINATIONS = new Set(['script', 'style', 'font', 'image']);
 
 /**
+ * 海报代理路径：图片 URL 与内容一一对应，历史 / 收藏会反复展示，
+ * 走缓存优先可以避免每次切页重新下载。/api/short-drama/image 实际是通用图片代理。
+ */
+const CACHEABLE_IMAGE_PATHS = new Set(['/api/douban/image', '/api/short-drama/image']);
+
+/**
  * 有效图片的最小体积。
  * 豆瓣占位图（image not available）约 3-6KB，正常海报在 15KB 以上，
  * 低于该阈值的图片不写入缓存，避免错误内容长期固化、之后无法自我恢复。
@@ -162,10 +168,7 @@ self.addEventListener('fetch', (event) => {
     // 接口数据不接管，交给浏览器与 CDN 的 HTTP 缓存策略；
     // 海报代理 URL 与图片一一对应且内容不变，走缓存优先，避免切页重建图片元素时重新下载
     if (url.pathname.startsWith('/api/')) {
-        if (
-            (url.pathname === '/api/douban/image' || url.pathname === '/api/short-drama/image') &&
-            request.destination === 'image'
-        ) {
+        if (CACHEABLE_IMAGE_PATHS.has(url.pathname) && request.destination === 'image') {
             event.respondWith(handleAsset(event));
         }
         return;

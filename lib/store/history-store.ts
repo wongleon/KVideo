@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { VideoHistoryItem, Episode, HistorySourceEntry } from '@/lib/types';
 import { clearSegmentsForUrl, clearAllCache } from '@/lib/utils/cacheManager';
+import { evictPosterCache, schedulePosterCacheGc } from '@/lib/utils/poster-url';
 import { profiledKey } from '@/lib/utils/profile-storage';
 
 const MAX_HISTORY_ITEMS = 50;
@@ -179,6 +180,9 @@ const createHistoryStore = (name: string) =>
 
             return { viewingHistory: newHistory };
           });
+
+          // 记录变化后回收不再被引用的海报缓存（内部已做合并与节流）
+          schedulePosterCacheGc();
         },
 
         removeFromHistory: (showIdentifier) => {
@@ -190,6 +194,8 @@ const createHistoryStore = (name: string) =>
           if (itemToRemove) {
             // Clear cache for this video
             clearSegmentsForUrl(itemToRemove.url);
+            // 同步清理该海报的图片缓存，避免删除记录后图片继续占用空间
+            evictPosterCache(itemToRemove.poster);
           }
 
           set((state) => ({
@@ -197,6 +203,7 @@ const createHistoryStore = (name: string) =>
               (item) => item.showIdentifier !== showIdentifier
             ),
           }));
+          schedulePosterCacheGc();
         },
 
         updateHistorySources: (title, sources) => {
@@ -230,11 +237,15 @@ const createHistoryStore = (name: string) =>
         clearHistory: () => {
           // Clear all cached segments
           clearAllCache();
+          // 清空记录时一并释放海报图片缓存
+          get().viewingHistory.forEach((item) => evictPosterCache(item.poster));
           set({ viewingHistory: [] });
+          schedulePosterCacheGc();
         },
 
         importHistory: (history) => {
           set({ viewingHistory: history });
+          schedulePosterCacheGc();
         },
       }),
       {

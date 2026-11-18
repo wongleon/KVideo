@@ -12,6 +12,8 @@
  * 不要只改其中一路。
  */
 
+import { schedulePosterCacheGc } from '@/lib/utils/poster-url';
+
 /** 静默刷新阈值：超过后先展示旧数据，同时请求最新数据 */
 export const FEED_CACHE_REFRESH_AFTER = 6 * 60 * 60 * 1000;
 
@@ -64,6 +66,9 @@ export function createFeedCacheStore<T>(storageKey: string, version = 1): FeedCa
 
             const payload: StoredFeedCache<T> = { version, entries };
             localStorage.setItem(storageKey, JSON.stringify(payload));
+
+            // 缓存内容变了，回收不再被引用的海报图片缓存
+            schedulePosterCacheGc();
         } catch {
             // 超出配额或被系统禁用时忽略，退化为纯内存缓存
         }

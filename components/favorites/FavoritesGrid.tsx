@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { VideoCard } from '@/components/search/VideoCard';
 import { FavoritesEmptyState } from './FavoritesEmptyState';
+import { buildPosterUrl } from '@/lib/utils/poster-url';
 import type { FavoriteItem, Video } from '@/lib/types';
 
 interface FavoritesGridProps {
@@ -24,7 +25,7 @@ export const FavoritesGrid = memo(function FavoritesGrid({
       favorites.map((favorite) => ({
         vod_id: favorite.videoId,
         vod_name: favorite.title,
-        vod_pic: favorite.poster,
+        vod_pic: buildPosterUrl(favorite.poster),
         vod_remarks: favorite.remarks,
         vod_year: favorite.year,
         type_name: favorite.type,
