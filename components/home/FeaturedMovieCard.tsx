@@ -6,6 +6,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useState } from 'react';
 
 interface FeaturedMovie {
   id: string;
@@ -21,6 +22,8 @@ interface FeaturedMovieCardProps {
 }
 
 export function FeaturedMovieCard({ movie, onMovieClick }: FeaturedMovieCardProps) {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <button
       type="button"
@@ -30,7 +33,8 @@ export function FeaturedMovieCard({ movie, onMovieClick }: FeaturedMovieCardProp
       className="relative block w-full aspect-[16/9] overflow-hidden rounded-xl bg-[var(--glass-bg)] mb-3 text-left cursor-pointer md:hidden"
     >
       <Image
-        src={movie.cover}
+        // 封面加载失败时回落到占位图，避免大卡片整块空白
+        src={imageError ? '/placeholder-poster.svg' : movie.cover}
         alt={movie.title}
         fill
         className="object-cover"
@@ -39,6 +43,7 @@ export function FeaturedMovieCard({ movie, onMovieClick }: FeaturedMovieCardProp
         unoptimized
         referrerPolicy="no-referrer"
         draggable={false}
+        onError={() => setImageError(true)}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4">

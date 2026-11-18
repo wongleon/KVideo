@@ -97,6 +97,20 @@ function resolveCategory(value: string | null): ShortDramaCategory {
   return value === 'ai-comic' || value === 'guoman' ? value : 'short-drama';
 }
 
+/**
+ * 采集站封面域名（p.lztutu.com 等）在国内网络直连时经常不可达，
+ * 直接引用会导致列表只有文字、海报全部加载失败；统一改写为同源代理地址，
+ * 由边缘节点回源并缓存（见 /api/short-drama/image）。
+ */
+function buildCoverUrl(rawPic: string | undefined): string {
+  if (!rawPic) return '/placeholder-poster.svg';
+
+  const pic = rawPic.startsWith('//') ? `https:${rawPic}` : rawPic;
+  if (!/^https?:\/\//i.test(pic)) return '/placeholder-poster.svg';
+
+  return `/api/short-drama/image?url=${encodeURIComponent(pic)}`;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
@@ -121,8 +135,8 @@ export async function GET(request: Request) {
       .map((item) => ({
         id: String(item.vod_id),
         title: String(item.vod_name),
-        // 采集站封面大多可直连；缺失时交给占位图，避免 Image 组件拿到空 src
-        cover: item.vod_pic || '/placeholder-poster.svg',
+        // 封面统一走同源代理，缺失或非 HTTP(S) 地址时回落到占位图
+        cover: buildCoverUrl(item.vod_pic),
         // 短剧没有豆瓣评分，留空后卡片与横向大卡都不会显示评分角标
         rate: '',
         url: '',

@@ -36,7 +36,8 @@ interface PageResult {
 
 /** 请求一页短剧数据，page 从 1 开始（后端页码） */
 async function fetchShortDramaPage(category: ShortDramaCategory, page: number): Promise<PageResult> {
-  const response = await fetch(`/api/short-drama?category=${category}&page=${page}`);
+  // v=2：封面已改为同源代理地址，带上版本号让 CDN 旧缓存立即失效
+  const response = await fetch(`/api/short-drama?category=${category}&page=${page}&v=2`);
   if (!response.ok) throw new Error('Failed to fetch short drama');
 
   const data = await response.json();
@@ -139,7 +140,7 @@ export function ShortDramaFeed({ category, onMovieClick }: ShortDramaFeedProps) 
     <>
       {/* 首条以横向大卡片展示，与豆瓣信息流的视觉节奏保持一致 */}
       {movies.length > 0 && (
-        <FeaturedMovieCard movie={movies[0]} onMovieClick={onMovieClick} />
+        <FeaturedMovieCard key={movies[0].id} movie={movies[0]} onMovieClick={onMovieClick} />
       )}
 
       <MovieGrid

@@ -547,7 +547,7 @@ function DoubanFeed({ queries, onMovieClick }: DoubanFeedProps) {
     <>
       {/* 当前标签的第一条以横向大卡片展示，切换标签时随之更新 */}
       {movies.length > 0 && (
-        <FeaturedMovieCard movie={movies[0]} onMovieClick={onMovieClick} />
+        <FeaturedMovieCard key={movies[0].id} movie={movies[0]} onMovieClick={onMovieClick} />
       )}
 
       <MovieGrid
