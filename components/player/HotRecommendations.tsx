@@ -1,32 +1,22 @@
 /**
- * YouMayAlsoLike - 播放页「猜你喜欢」模块
- * 基于当前视频的类型 / 演员 / 地区推荐相似内容，最多展示 6 条，点击卡片跳转搜索
+ * HotRecommendations - 播放页「热门推荐」模块
+ * 展示豆瓣全站热榜内容（电影 + 剧集），最多 6 条，点击卡片跳转搜索
  */
 
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { MovieCard } from '@/components/home/MovieCard';
 import { clearSearchPageCache } from '@/lib/utils/search-page-cache';
-import { useSimilarRecommendations, type SimilarMovie } from './hooks/useSimilarRecommendations';
+import { useHotRecommendations, type HotMovie } from './hooks/useHotRecommendations';
 
-interface YouMayAlsoLikeProps {
-  title?: string;
-  typeName?: string;
-  actors?: string;
-  area?: string;
-}
-
-export function YouMayAlsoLike({ title, typeName, actors, area }: YouMayAlsoLikeProps) {
+export function HotRecommendations() {
   const router = useRouter();
-  // 首次进入播放页时固定推荐参数：切换视频源会替换详情数据，
-  // 但「猜你喜欢」应保持稳定，避免重复请求与模块闪烁
-  const [initialParams] = useState(() => ({ title, typeName, actors, area }));
-  const { movies, loading } = useSimilarRecommendations(initialParams);
+  const { movies, loading } = useHotRecommendations();
 
   const handleMovieClick = useCallback(
-    (movie: SimilarMovie) => {
+    (movie: HotMovie) => {
       // 主动发起新的搜索，清空上次记录，避免回显旧搜索结果
       clearSearchPageCache();
       router.push(`/search?q=${encodeURIComponent(movie.title)}`);
@@ -39,7 +29,7 @@ export function YouMayAlsoLike({ title, typeName, actors, area }: YouMayAlsoLike
 
   return (
     <section className="pt-2">
-      <h2 className="mb-4 text-lg font-bold text-[var(--text-color)]">猜你喜欢</h2>
+      <h2 className="mb-4 text-lg font-bold text-[var(--text-color)]">热门推荐</h2>
 
       {loading && movies.length === 0 ? (
         <div className="flex justify-center py-10">

@@ -15,7 +15,7 @@ import { useVideoPlayer } from '@/lib/hooks/useVideoPlayer';
 import { useHistory } from '@/lib/store/history-store';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
 import { MobileVideoInfo } from '@/components/player/MobileVideoInfo';
-import { YouMayAlsoLike } from '@/components/player/YouMayAlsoLike';
+import { HotRecommendations } from '@/components/player/HotRecommendations';
 import { htmlToText } from '@/lib/utils/html';
 import { settingsStore } from '@/lib/store/settings-store';
 import { userSourcesStore } from '@/lib/store/user-sources-store';
@@ -578,13 +578,8 @@ function PlayerContent() {
             </div>
           </div>
 
-          {/* 猜你喜欢：基于当前视频类型 / 演员 / 地区推荐 */}
-          <YouMayAlsoLike
-            title={videoData?.vod_name || title || ''}
-            typeName={videoData?.type_name}
-            actors={videoData?.vod_actor}
-            area={videoData?.vod_area}
-          />
+          {/* 热门推荐：豆瓣全站热榜，不依赖当前视频标签 */}
+          <HotRecommendations />
           </div>
         )}
       </main>
