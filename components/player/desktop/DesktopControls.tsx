@@ -23,6 +23,8 @@ interface DesktopControlsProps {
     isProxied?: boolean;
     progressBarRef: React.RefObject<HTMLDivElement | null>;
     volumeBarRef: React.RefObject<HTMLDivElement | null>;
+    videoRef: React.RefObject<HTMLVideoElement | null>;
+    isDraggingProgressRef: React.MutableRefObject<boolean>;
     onTogglePlay: () => void;
     onToggleMute: () => void;
     onVolumeChange: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -79,6 +81,10 @@ export function DesktopControls(props: DesktopControlsProps) {
             {/* Progress Bar */}
             <DesktopProgressBar
                 progressBarRef={progressBarRef}
+                videoRef={props.videoRef}
+                isPlaying={props.isPlaying}
+                playbackRate={props.playbackRate}
+                isDraggingProgressRef={props.isDraggingProgressRef}
                 currentTime={currentTime}
                 duration={duration}
                 bufferedTime={bufferedTime}

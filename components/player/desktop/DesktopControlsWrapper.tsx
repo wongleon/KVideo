@@ -55,6 +55,8 @@ export function DesktopControlsWrapper({ src, data, logic, refs, onToggleSpeedMe
     const {
         progressBarRef,
         volumeBarRef,
+        videoRef,
+        isDraggingProgressRef,
     } = refs;
 
     const isProxied = src.includes('/api/proxy');
@@ -78,6 +80,8 @@ export function DesktopControlsWrapper({ src, data, logic, refs, onToggleSpeedMe
             isProxied={isProxied}
             progressBarRef={progressBarRef}
             volumeBarRef={volumeBarRef}
+            videoRef={videoRef}
+            isDraggingProgressRef={isDraggingProgressRef}
             onTogglePlay={togglePlay}
             onToggleMute={toggleMute}
             onVolumeChange={handleVolumeChange}
