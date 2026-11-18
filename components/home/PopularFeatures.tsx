@@ -49,9 +49,9 @@ export const HOME_FILTERS: HomeFilter[] = [
       { type: 'tv', tag: '热门', sort: 'time' },
     ],
   },
-  { id: 'tv', label: '国产剧', queries: [{ type: 'tv', tag: '国产剧' }] },
+  { id: 'tv', label: '国产剧', queries: [{ type: 'tv', tag: '国产剧', sort: 'time' }] },
   { id: 'movie', label: '电影', queries: [{ type: 'movie', tag: '最新' }] },
-  { id: 'us-tv', label: '美剧', queries: [{ type: 'tv', tag: '美剧' }] },
+  { id: 'us-tv', label: '美剧', queries: [{ type: 'tv', tag: '美剧', sort: 'time' }] },
   {
     id: 'guoman',
     label: '国漫',
@@ -59,7 +59,7 @@ export const HOME_FILTERS: HomeFilter[] = [
     // 国漫对应量子资源的「国产动漫」分类
     queries: [],
   },
-  { id: 'variety', label: '综艺', queries: [{ type: 'tv', tag: '综艺' }] },
+  { id: 'variety', label: '综艺', queries: [{ type: 'tv', tag: '综艺', sort: 'time' }] },
   {
     id: 'short-drama',
     label: '短剧',
