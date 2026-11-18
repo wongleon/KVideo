@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useInfiniteScroll } from '@/lib/hooks/useInfiniteScroll';
+import { createFeedCacheStore } from '@/lib/utils/feed-cache';
 import { FeaturedMovieCard } from './FeaturedMovieCard';
 import { MovieGrid } from './MovieGrid';
 
@@ -23,11 +24,12 @@ export interface ShortDramaMovie {
 /** 数据分类：真人短剧 / AI 生成短剧 / 国产动漫 */
 export type ShortDramaCategory = 'short-drama' | 'ai-comic' | 'guoman';
 
-/** 首屏缓存有效期：切回短剧标签时直接复用，避免重复回源 */
-const FIRST_PAGE_CACHE_TTL = 10 * 60 * 1000;
-
-/** 模块级缓存：路由切换会卸载组件，放在模块作用域可在同一次会话内保留首屏数据 */
-const firstPageCache = new Map<ShortDramaCategory, { movies: ShortDramaMovie[]; timestamp: number }>();
+/**
+ * 短剧系首屏缓存（短剧 / AI漫剧 / 国漫）。
+ * 刷新阈值 / 保留期 / 持久化实现统一在 lib/utils/feed-cache 中维护，
+ * 与豆瓣信息流共用同一套策略，调整时需两路一起改。
+ */
+const firstPageCache = createFeedCacheStore<ShortDramaMovie[]>('short-drama-feed-first-page');
 
 interface PageResult {
   movies: ShortDramaMovie[];
@@ -60,29 +62,32 @@ export function ShortDramaFeed({ category, onMovieClick }: ShortDramaFeedProps) 
   // 首屏只加载一次：开发模式下 effect 会执行两次，避免重复回源
   const firstLoadStartedRef = useRef(false);
 
-  /** 加载首屏：命中缓存时先渲染缓存，否则回源请求第一页 */
+  /** 加载首屏：命中缓存时先渲染缓存，超过刷新阈值再静默更新 */
   const loadFirstPage = useCallback(async () => {
     setFailed(false);
 
-    const cached = firstPageCache.get(category);
-    if (cached && Date.now() - cached.timestamp < FIRST_PAGE_CACHE_TTL) {
-      setMovies(cached.movies);
+    const cached = firstPageCache.read(category);
+    if (cached) {
+      setMovies(cached.data);
       setHasMore(true);
       setLoading(false);
-      return;
+      // 未超过刷新阈值：直接复用，不再请求
+      if (!cached.stale) return;
+    } else {
+      setLoading(true);
     }
 
-    setLoading(true);
     try {
       const result = await fetchShortDramaPage(category, 1);
       setMovies(result.movies);
       setHasMore(result.hasMore);
       // 空结果多为采集站瞬时异常，不写入缓存，避免整个会话持续空白
       if (result.movies.length > 0) {
-        firstPageCache.set(category, { movies: result.movies, timestamp: Date.now() });
+        firstPageCache.write(category, result.movies);
       }
     } catch {
-      setFailed(true);
+      // 已有缓存时属于静默刷新失败，保留旧内容，不切换到错误页
+      if (!cached) setFailed(true);
     } finally {
       setLoading(false);
     }

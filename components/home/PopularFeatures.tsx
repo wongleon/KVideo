@@ -10,6 +10,7 @@ import { MovieGrid } from './MovieGrid';
 import { FeaturedMovieCard } from './FeaturedMovieCard';
 import { ShortDramaFeed } from './ShortDramaFeed';
 import { useInfiniteScroll } from '@/lib/hooks/useInfiniteScroll';
+import { createFeedCacheStore } from '@/lib/utils/feed-cache';
 
 interface DoubanMovie {
   id: string;
@@ -78,96 +79,13 @@ export const HOME_FILTERS: HomeFilter[] = [
 
 const PAGE_LIMIT = 20;
 
-/** 首屏数据刷新阈值：超过后先展示旧数据，同时静默请求最新数据并替换缓存 */
-const FEED_CACHE_REFRESH_AFTER = 6 * 60 * 60 * 1000;
-
-/** 持久化保留期：超过后视为没有缓存，直接重新加载，避免展示过于陈旧的内容 */
-const FEED_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-
-interface CachedFeed {
-  movies: DoubanMovie[];
-  timestamp: number;
-}
-
 /**
- * 模块级缓存：Next.js 路由切换会卸载首页组件，组件内 state 随之丢失，
- * 放在模块作用域可以在同一次会话内跨路由保留，切回首页时立即渲染，无需重新加载。
+ * 豆瓣信息流首屏缓存。
+ * 刷新阈值 / 保留期 / 持久化实现统一在 lib/utils/feed-cache 中维护，
+ * 与短剧系（短剧 / AI漫剧 / 国漫）共用同一套策略，调整时需两路一起改。
+ * version 2：缓存结构从 { movies } 改为 { data }，旧数据整体作废。
  */
-const firstPageCache = new Map<string, CachedFeed>();
-
-/**
- * 首屏缓存同时持久化到 localStorage：
- * iOS PWA 退到后台或冷启动时模块内存会清空，切回首页就只剩骨架屏。
- * 持久化后先展示上次的内容，再按刷新阈值决定是否静默更新。
- */
-const FEED_CACHE_STORAGE_KEY = 'douban-feed-first-page';
-const FEED_CACHE_STORAGE_VERSION = 1;
-
-interface StoredFeedCache {
-  version: number;
-  entries: Record<string, CachedFeed>;
-}
-
-let persistedCacheLoaded = false;
-
-/** 首次读取缓存时把持久化的数据回填到内存，内存中的数据始终优先（更新） */
-function ensurePersistedCacheLoaded(): void {
-  if (persistedCacheLoaded) return;
-  persistedCacheLoaded = true;
-  if (typeof window === 'undefined') return;
-
-  try {
-    const raw = localStorage.getItem(FEED_CACHE_STORAGE_KEY);
-    if (!raw) return;
-
-    const parsed = JSON.parse(raw) as StoredFeedCache;
-    if (!parsed || parsed.version !== FEED_CACHE_STORAGE_VERSION || !parsed.entries) {
-      localStorage.removeItem(FEED_CACHE_STORAGE_KEY);
-      return;
-    }
-
-    const now = Date.now();
-    let needsRewrite = false;
-
-    for (const [key, entry] of Object.entries(parsed.entries)) {
-      if (!entry || !Array.isArray(entry.movies) || typeof entry.timestamp !== 'number') {
-        needsRewrite = true;
-        continue;
-      }
-      // 超过保留期的数据不再使用，下次打开直接重新加载
-      if (now - entry.timestamp > FEED_CACHE_MAX_AGE) {
-        needsRewrite = true;
-        continue;
-      }
-      if (firstPageCache.has(key)) continue;
-      firstPageCache.set(key, entry);
-    }
-
-    // 顺手清掉过期/损坏的条目，避免长期占用存储空间
-    if (needsRewrite) persistPageCache();
-  } catch {
-    // 存储不可用或内容损坏时忽略，退化为纯内存缓存
-  }
-}
-
-function persistPageCache(): void {
-  if (typeof window === 'undefined') return;
-
-  try {
-    const now = Date.now();
-    const entries: Record<string, CachedFeed> = {};
-    firstPageCache.forEach((entry, key) => {
-      // 超过保留期的条目不写入，避免把已失效的数据长期留在存储里
-      if (now - entry.timestamp > FEED_CACHE_MAX_AGE) return;
-      entries[key] = entry;
-    });
-
-    const payload: StoredFeedCache = { version: FEED_CACHE_STORAGE_VERSION, entries };
-    localStorage.setItem(FEED_CACHE_STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // 超出配额或被系统禁用时忽略，不影响内存缓存
-  }
-}
+const firstPageCache = createFeedCacheStore<DoubanMovie[]>('douban-feed-first-page', 2);
 
 /**
  * 进行中的分页请求。
@@ -184,27 +102,15 @@ function getQueryKey(queries: DoubanQuery[]): string {
 }
 
 /** 读取首屏缓存，stale 表示已超过刷新阈值（仍可先展示，再静默刷新） */
-function readFirstPageCache(queries: DoubanQuery[]): (CachedFeed & { stale: boolean }) | null {
-  ensurePersistedCacheLoaded();
-
-  const key = getQueryKey(queries);
-  const cached = firstPageCache.get(key);
-  if (!cached) return null;
-
-  const age = Date.now() - cached.timestamp;
-  if (age > FEED_CACHE_MAX_AGE) {
-    firstPageCache.delete(key);
-    return null;
-  }
-
-  return { ...cached, stale: age > FEED_CACHE_REFRESH_AFTER };
+function readFirstPageCache(queries: DoubanQuery[]): { movies: DoubanMovie[]; stale: boolean } | null {
+  const hit = firstPageCache.read(getQueryKey(queries));
+  return hit ? { movies: hit.data, stale: hit.stale } : null;
 }
 
 function writeFirstPageCache(queries: DoubanQuery[], movies: DoubanMovie[]): void {
   // 空结果多为豆瓣抖动，不写入缓存，避免切回来看到空页面
   if (movies.length === 0) return;
-  firstPageCache.set(getQueryKey(queries), { movies, timestamp: Date.now() });
-  persistPageCache();
+  firstPageCache.write(getQueryKey(queries), movies);
 }
 
 interface DoubanPageResult {
