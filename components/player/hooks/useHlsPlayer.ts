@@ -95,8 +95,10 @@ export function useHlsPlayer({
                     // Buffer Settings
                     maxBufferLength: 120,
                     maxMaxBufferLength: 240,
-                    maxBufferSize: 120 * 1000 * 1000,
-                    maxBufferHole: 0.5,
+                    // 高码率源下 120MB 只够 40~60 秒，适当放宽上限，避免频繁因容量限制停止预加载
+                    maxBufferSize: 240 * 1000 * 1000,
+                    // 允许跨过 1.5 秒以内的缓冲空洞，减少因小段缺失而停下来等待
+                    maxBufferHole: 1.5,
 
                     // Start with more buffer
                     startFragPrefetch: true,
@@ -111,9 +113,10 @@ export function useHlsPlayer({
                     abrBandWidthUpFactor: 0.7,
 
                     // Loading Settings
-                    fragLoadingMaxRetry: 6,
-                    fragLoadingRetryDelay: 1000,
-                    fragLoadingMaxRetryTimeout: 64000,
+                    // 单个坏分片不应长时间阻塞播放：缩短单次超时与重试窗口，尽快失败并交由上层重试/换源
+                    fragLoadingMaxRetry: 4,
+                    fragLoadingRetryDelay: 500,
+                    fragLoadingMaxRetryTimeout: 8000,
                     manifestLoadingMaxRetry: 4,
                     manifestLoadingRetryDelay: 1000,
                     manifestLoadingMaxRetryTimeout: 64000,
@@ -122,7 +125,7 @@ export function useHlsPlayer({
                     levelLoadingMaxRetryTimeout: 64000,
 
                     // Timeouts
-                    fragLoadingTimeOut: 20000,
+                    fragLoadingTimeOut: 8000,
                     manifestLoadingTimeOut: 10000,
                     levelLoadingTimeOut: 10000,
 
@@ -166,9 +169,12 @@ export function useHlsPlayer({
                             });
                             if (hasHEVC) {
                                 if (h264Indices.length > 0) {
-                                    // H.264 alternatives exist — lock to first H.264 level
-                                    console.info('[HLS] HEVC detected, using H.264 level for compatibility');
-                                    hls.currentLevel = h264Indices[0];
+                                    // 用 autoLevelCapping 把自动切换封顶到最后一个 H.264 档：
+                                    // 既避开 HEVC 档，又保留 ABR 在 H.264 各档之间升/降档的能力，
+                                    // 避免锁死单档后带宽不足时持续追不上缓冲（也无法升画质）。
+                                    const highestH264Index = Math.max(...h264Indices);
+                                    hls.autoLevelCapping = highestH264Index;
+                                    console.info(`[HLS] 检测到 HEVC，自动切换上限设为 H.264 档位 ${highestH264Index}`);
                                 } else {
                                     // All levels are HEVC — warn user
                                     console.warn('[HLS] ⚠️ All levels are HEVC, browser may not support');
