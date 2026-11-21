@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -14,6 +14,12 @@ import { usePathname, useRouter } from 'next/navigation';
 const ITEM_WIDTH = 76;
 /** 单个导航项的固定高度 */
 const ITEM_HEIGHT = 54;
+
+/**
+ * 客户端导航兜底阈值：点击后超过该时间 URL 仍未变化，
+ * 说明 RSC 请求卡住或失败，改用整页导航
+ */
+const NAV_FAILOVER_DELAY = 3000;
 
 interface NavIconProps {
     size?: number;
@@ -81,6 +87,21 @@ export function BottomNav() {
 
     const activePath = pendingPath && pendingPath !== currentPath ? pendingPath : currentPath;
     const activeIndex = NAV_ITEMS.findIndex((item) => item.href === activePath);
+
+    // 客户端导航兜底定时器：超时仍未切换路径时，改用整页导航
+    const failoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const clearFailoverTimer = useCallback(() => {
+        if (!failoverTimerRef.current) return;
+        clearTimeout(failoverTimerRef.current);
+        failoverTimerRef.current = null;
+    }, []);
+
+    // 路由切换成功（pathname 变化）或组件卸载时取消兜底，避免重复跳转
+    useEffect(() => {
+        clearFailoverTimer();
+        return clearFailoverTimer;
+    }, [currentPath, clearFailoverTimer]);
 
     useEffect(() => {
         const raf = requestAnimationFrame(() => setMounted(true));
@@ -185,7 +206,23 @@ export function BottomNav() {
                                 ) {
                                     return;
                                 }
-                                if (href !== currentPath) setPendingPath(href);
+                                if (href === currentPath) return;
+
+                                setPendingPath(href);
+
+                                // 客户端导航可能因 RSC 请求卡住或失败而长时间停在旧页面，
+                                // 超过阈值仍未切到目标路径时改用整页导航；
+                                // 整页请求会命中 Service Worker 的导航缓存，PWA 下也能快速渲染
+                                clearFailoverTimer();
+                                failoverTimerRef.current = setTimeout(() => {
+                                    failoverTimerRef.current = null;
+                                    // 离线时整页导航可能被 Service Worker 回落到首页外壳
+                                    // （目标页无缓存且请求失败），此时停在原页面更稳妥
+                                    if (navigator.onLine === false) return;
+                                    if (normalizePath(window.location.pathname) === currentPath) {
+                                        window.location.href = href;
+                                    }
+                                }, NAV_FAILOVER_DELAY);
                             }}
                             className={`relative z-10 flex flex-col items-center justify-center rounded-[22px] cursor-pointer transition-colors duration-300 ${
                                 isActive
