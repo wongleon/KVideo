@@ -9,8 +9,37 @@ interface UseHlsPlayerProps {
     src: string;
     isPremium?: boolean;
     autoPlay?: boolean;
+    /** 当前播放倍速，用于按倍率放大缓冲目标 */
+    playbackRate?: number;
     onAutoPlayPrevented?: (error: Error) => void;
     onError?: (message: string) => void;
+}
+
+// 1 倍速下的媒体缓冲目标（秒）
+const BASE_MAX_BUFFER_LENGTH = 120;
+const MAX_MAX_BUFFER_LENGTH = 480;
+// 1 倍速下的缓冲容量上限（字节）
+const BASE_MAX_BUFFER_SIZE = 240 * 1000 * 1000;
+const MAX_BUFFER_SIZE = 480 * 1000 * 1000;
+// 播放器当前最高支持 2 倍速，倍率放大以此封顶
+const MAX_PLAYBACK_RATE_BOOST = 2;
+
+/**
+ * 倍速播放时按倍率放大缓冲目标，让实际可播放时长（墙钟时间）保持不变。
+ * 否则 2 倍速下 120 秒的媒体缓冲只够播放 60 秒，网络稍一抖动就会追平。
+ */
+function getBufferTargets(playbackRate: number) {
+    const rate = Number.isFinite(playbackRate) && playbackRate > 0
+        ? Math.min(playbackRate, MAX_PLAYBACK_RATE_BOOST)
+        : 1;
+
+    const maxBufferLength = Math.min(BASE_MAX_BUFFER_LENGTH * rate, MAX_MAX_BUFFER_LENGTH);
+
+    return {
+        maxBufferLength,
+        maxMaxBufferLength: Math.max(BASE_MAX_BUFFER_LENGTH * 2, maxBufferLength * 2),
+        maxBufferSize: Math.min(BASE_MAX_BUFFER_SIZE * rate, MAX_BUFFER_SIZE),
+    };
 }
 
 export function useHlsPlayer({
@@ -18,6 +47,7 @@ export function useHlsPlayer({
     src,
     isPremium = false,
     autoPlay = false,
+    playbackRate = 1,
     onAutoPlayPrevented,
     onError
 }: UseHlsPlayerProps) {
@@ -93,10 +123,8 @@ export function useHlsPlayer({
                     lowLatencyMode: false,
 
                     // Buffer Settings
-                    maxBufferLength: 120,
-                    maxMaxBufferLength: 240,
-                    // 高码率源下 120MB 只够 40~60 秒，适当放宽上限，避免频繁因容量限制停止预加载
-                    maxBufferSize: 240 * 1000 * 1000,
+                    // 缓冲目标随倍速放大；高码率源下同时放宽容量上限，避免过早停止预加载
+                    ...getBufferTargets(playbackRate),
                     // 允许跨过 1.5 秒以内的缓冲空洞，减少因小段缺失而停下来等待
                     maxBufferHole: 1.5,
 
@@ -442,4 +470,15 @@ export function useHlsPlayer({
             extraBlobs.forEach(url => URL.revokeObjectURL(url));
         };
     }, [src, videoRef, autoPlay, isAdFilterEnabled, adFilterMode, adKeywords, mediaProxyEnabled]);
+
+    // 倍速切换只更新缓冲目标，不重建 HLS 实例，避免播放中断
+    useEffect(() => {
+        const hls = hlsRef.current;
+        if (!hls) return;
+
+        const targets = getBufferTargets(playbackRate);
+        hls.config.maxBufferLength = targets.maxBufferLength;
+        hls.config.maxMaxBufferLength = targets.maxMaxBufferLength;
+        hls.config.maxBufferSize = targets.maxBufferSize;
+    }, [playbackRate]);
 }
