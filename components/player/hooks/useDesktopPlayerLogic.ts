@@ -190,7 +190,8 @@ export function useDesktopPlayerLogic({
         },
         startSpeedMenuTimeout: controlsVisibility.startSpeedMenuTimeout,
         clearSpeedMenuTimeout: controlsVisibility.clearSpeedMenuTimeout,
-        formatTime: playbackControls.formatTime
+        formatTime: playbackControls.formatTime,
+        showToastNotification: utilities.showToastNotification
     }), [
         src,
         controlsVisibility,

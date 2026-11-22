@@ -6,6 +6,7 @@ import { useDesktopPlayerLogic } from './hooks/useDesktopPlayerLogic';
 import { useHlsPlayer } from './hooks/useHlsPlayer';
 import { useAutoSkip } from './hooks/useAutoSkip';
 import { useStallDetection } from './hooks/useStallDetection';
+import { useNetworkSpeedFallback } from './hooks/useNetworkSpeedFallback';
 import { useVideoResolution } from './hooks/useVideoResolution';
 import { DesktopControlsWrapper } from './desktop/DesktopControlsWrapper';
 import { DesktopOverlayWrapper } from './desktop/DesktopOverlayWrapper';
@@ -249,6 +250,21 @@ export function DesktopVideoPlayer({
     onNextEpisode,
     isReversed,
     src,
+  });
+
+  // 倍速播放时缓冲不足则逐档降速，避免长时间转圈
+  const showToastNotification = logic.showToastNotification;
+  const handleAutoDowngrade = React.useCallback((nextRate: number) => {
+    actions.setPlaybackRate(nextRate);
+    showToastNotification(`网络跟不上，已自动降到 ${nextRate}x 播放`);
+  }, [actions, showToastNotification]);
+
+  useNetworkSpeedFallback({
+    videoRef,
+    playbackRate: data.playbackRate,
+    isDraggingProgressRef: refs.isDraggingProgressRef,
+    isTransitioningToNextEpisode,
+    onDowngrade: handleAutoDowngrade,
   });
 
   // Sensitive stalling detection (e.g. video stuck but HTML5 state says playing)
