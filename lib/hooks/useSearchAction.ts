@@ -7,7 +7,7 @@ import { settingsStore } from '@/lib/store/settings-store';
 import { useSearchState } from './useSearchState';
 
 type SearchState = ReturnType<typeof useSearchState>;
-type SearchSourceConfig = { id: string; baseUrl?: string };
+type SearchSourceConfig = { id: string; name?: string; baseUrl?: string };
 
 interface UseSearchActionProps {
     state: SearchState;
@@ -104,7 +104,11 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                     } else {
                         sourcesMap.set(sourceId, {
                             count: newVideos.length,
-                            name: newVideos[0]?.sourceName || sourceId,
+                            // 名称优先取请求中的源配置，避免源配置有名称时仍回退显示成源 id
+                            name:
+                                sourceConfigs.get(sourceId)?.name?.trim() ||
+                                newVideos[0]?.sourceName ||
+                                sourceId,
                             baseUrl: sourceConfigs.get(sourceId)?.baseUrl,
                         });
                     }
