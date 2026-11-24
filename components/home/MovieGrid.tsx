@@ -23,6 +23,13 @@ interface MovieGridProps {
   loadMoreRef: React.RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * 首屏预取上限：视口内（移动端 2 列约 4 屏）可覆盖的数量。
+ * 超过该数量的卡片关闭预取，避免几十条「进入搜索页」的 RSC 请求同时发出、
+ * 与用户真正点击的那一条抢占带宽。
+ */
+const PREFETCH_LIMIT = 12;
+
 export function MovieGrid({
   movies,
   loading,
@@ -38,11 +45,12 @@ export function MovieGrid({
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-        {movies.map((movie) => (
+        {movies.map((movie, index) => (
           <MovieCard
             key={movie.id}
             movie={movie}
             onMovieClick={onMovieClick}
+            prefetch={index < PREFETCH_LIMIT}
           />
         ))}
       </div>

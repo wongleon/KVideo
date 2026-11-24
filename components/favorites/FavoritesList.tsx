@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import type { FavoriteItem, VideoHistoryItem } from '@/lib/types';
 import { useHistory } from '@/lib/store/history-store';
 import { FavoritesItem } from './FavoritesItem';
@@ -13,11 +13,19 @@ import { keepRenderableFavorites } from '@/lib/utils/sync-records';
 
 interface FavoritesListProps {
     favorites: FavoriteItem[];
+    /** 取消收藏回调：需要由调用方用 useCallback 保证引用稳定 */
     onRemove: (videoId: string | number, source: string) => void;
     isPremium?: boolean;
 }
 
-export function FavoritesList({ favorites, onRemove, isPremium = false }: FavoritesListProps) {
+/** 只对视口内前几条开启预取 */
+const PREFETCH_LIMIT = 8;
+
+export const FavoritesList = memo(function FavoritesList({
+    favorites,
+    onRemove,
+    isPremium = false,
+}: FavoritesListProps) {
     const { viewingHistory } = useHistory(isPremium);
 
     // 标题 → 最近一条观看历史，用于收藏项共享历史记录的进度、集数与线路
@@ -38,15 +46,16 @@ export function FavoritesList({ favorites, onRemove, isPremium = false }: Favori
 
     return (
         <div className="flex-1 overflow-y-auto -mx-2 px-2 space-y-2 scroll-smooth">
-            {renderableFavorites.map((item) => (
+            {renderableFavorites.map((item, index) => (
                 <FavoritesItem
                     key={`${item.source}:${item.videoId}`}
                     item={item}
                     historyItem={historyByTitle.get(item.title.toLowerCase().trim())}
-                    onRemove={() => onRemove(item.videoId, item.source)}
+                    onRemove={onRemove}
                     isPremium={isPremium}
+                    prefetch={index < PREFETCH_LIMIT}
                 />
             ))}
         </div>
     );
-}
+});

@@ -18,6 +18,42 @@ interface VideoData {
   episodes?: Array<{ name?: string; url: string }>;
 }
 
+/**
+ * 详情短期缓存
+ *
+ * 从播放页返回列表再点进同一部影片时，不必等 /api/detail 回源：
+ * 先用手上这份数据把播放器渲染出来，同时仍发起一次网络请求刷新。
+ */
+const DETAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+const DETAIL_CACHE_LIMIT = 30;
+const detailCache = new Map<string, { data: VideoData; expiresAt: number }>();
+
+function getDetailCacheKey(videoId: string, source: string): string {
+  return `${source}:${videoId}`;
+}
+
+function readDetailCache(videoId: string, source: string): VideoData | null {
+  const key = getDetailCacheKey(videoId, source);
+  const hit = detailCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    detailCache.delete(key);
+    return null;
+  }
+  return hit.data;
+}
+
+function writeDetailCache(videoId: string, source: string, data: VideoData): void {
+  if (detailCache.size >= DETAIL_CACHE_LIMIT) {
+    const oldestKey = detailCache.keys().next().value;
+    if (oldestKey) detailCache.delete(oldestKey);
+  }
+  detailCache.set(getDetailCacheKey(videoId, source), {
+    data,
+    expiresAt: Date.now() + DETAIL_CACHE_TTL_MS,
+  });
+}
+
 interface UseVideoPlayerReturn {
   videoData: VideoData | null;
   loading: boolean;
@@ -69,7 +105,27 @@ export function useVideoPlayer(
     onSourceUnavailableRef.current = onSourceUnavailable;
   }, [onSourceUnavailable]);
 
+  /** 把详情数据落到各个 state（网络返回与本地缓存共用同一套规则） */
+  const applyVideoDetail = useCallback((data: VideoData) => {
+    setVideoData(data);
+    setLoading(false);
 
+    if (data.episodes && data.episodes.length > 0) {
+      const latestIsReversed = isReversedRef.current;
+      const latestEpisodeParam = episodeParamRef.current;
+
+      const defaultIndex = latestIsReversed ? data.episodes.length - 1 : 0;
+      const episodeIndex = latestEpisodeParam ? parseInt(latestEpisodeParam, 10) : defaultIndex;
+      const validIndex = (episodeIndex >= 0 && episodeIndex < data.episodes.length) ? episodeIndex : defaultIndex;
+
+      const episodeUrl = data.episodes[validIndex].url;
+      setCurrentEpisode(validIndex);
+      setPlayUrl(episodeUrl);
+    } else {
+      setVideoError('该来源没有可播放的剧集');
+      setLoading(false);
+    }
+  }, []);
 
   const fetchVideoDetails = useCallback(async () => {
     if (!videoId || !source) return;
@@ -81,6 +137,15 @@ export function useVideoPlayer(
       // Standard behavior: clear error and show loading.
       setVideoError('');
       setLoading(true);
+
+      // 先渲染本地短期缓存：详情请求未返回前也能看到播放器与选集，
+      // 随后仍然请求网络，保证剧集信息是最新的
+      if (!hasPlayableDataRef.current) {
+        const cached = readDetailCache(videoId, source);
+        if (cached) {
+          applyVideoDetail(cached);
+        }
+      }
 
       const settings = settingsStore.getSettings();
       const allSources = [
@@ -120,24 +185,11 @@ export function useVideoPlayer(
       }
 
       if (data.success && data.data) {
-        setVideoData(data.data);
-        setLoading(false);
-
+        // 只有拿得到剧集时才缓存，避免把「该来源没有可播放的剧集」长期固化
         if (data.data.episodes && data.data.episodes.length > 0) {
-          const latestIsReversed = isReversedRef.current;
-          const latestEpisodeParam = episodeParamRef.current;
-
-          const defaultIndex = latestIsReversed ? data.data.episodes.length - 1 : 0;
-          const episodeIndex = latestEpisodeParam ? parseInt(latestEpisodeParam, 10) : defaultIndex;
-          const validIndex = (episodeIndex >= 0 && episodeIndex < data.data.episodes.length) ? episodeIndex : defaultIndex;
-
-          const episodeUrl = data.data.episodes[validIndex].url;
-          setCurrentEpisode(validIndex);
-          setPlayUrl(episodeUrl);
-        } else {
-          setVideoError('该来源没有可播放的剧集');
-          setLoading(false);
+          writeDetailCache(videoId, source, data.data);
         }
+        applyVideoDetail(data.data);
       } else {
         throw new Error(data.error || '来自 API 的响应无效');
       }
@@ -146,7 +198,7 @@ export function useVideoPlayer(
       setVideoError(error instanceof Error ? error.message : '加载视频详情失败。');
       setLoading(false);
     }
-  }, [videoId, source]);
+  }, [videoId, source, applyVideoDetail]);
 
   // EFFECT: Retry logic when settings change (e.g., sources loaded from subscriptions)
   useEffect(() => {

@@ -7,6 +7,8 @@
  *
  * 这里的策略：
  * - 导航请求：缓存优先，命中后立即返回外壳，同时后台静默更新（下次启动即为最新版本）
+ * - 外壳与查询参数无关的页面（搜索/播放/高级版）：带参数导航共用同一条外壳缓存
+ * - App Router 的 RSC 数据请求：stale-while-revalidate，点击导航时能立即渲染目标页
  * - 带 hash 的构建产物（JS/CSS/字体/图片）：缓存优先，无需重复下载
  * - 豆瓣海报代理：缓存优先，图片 URL 与内容一一对应，避免重建元素时重新下载
  * - 其余 /api 请求：完全不接管，保证数据新鲜
@@ -16,6 +18,8 @@
 const CACHE_VERSION = 'v3';
 const SHELL_CACHE = `kvideo-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `kvideo-asset-${CACHE_VERSION}`;
+// RSC 缓存单独建库并独立版本：升级它不会影响已经缓存好的构建产物
+const RSC_CACHE = 'kvideo-rsc-v1';
 
 /** 旧版本遗留的缓存前缀，激活时一并清理 */
 const LEGACY_CACHE_PREFIXES = ['video-cache-'];
@@ -31,6 +35,20 @@ const CACHEABLE_DESTINATIONS = new Set(['script', 'style', 'font', 'image']);
  * 走缓存优先可以避免每次切页重新下载。/api/short-drama/image 实际是通用图片代理。
  */
 const CACHEABLE_IMAGE_PATHS = new Set(['/api/douban/image', '/api/short-drama/image']);
+
+/**
+ * HTML 外壳与查询参数无关的页面。
+ * 这些页面都是客户端组件，服务端只返回固定外壳，因此带 query 导航时可以共用一份缓存，
+ * 不必每次点击都等一次服务器往返（PWA 冷启动时这段等待尤其明显）。
+ */
+const SHELL_QUERY_PATHNAMES = new Set([
+    '/search',
+    '/player',
+    '/premium',
+    '/premium/favorites',
+    '/premium/settings',
+    '/iptv',
+]);
 
 /**
  * 有效图片的最小体积。
@@ -56,7 +74,7 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then(async (cacheNames) => {
             const staleCacheNames = cacheNames.filter((cacheName) => {
-                if (cacheName === SHELL_CACHE || cacheName === ASSET_CACHE) return false;
+                if (cacheName === SHELL_CACHE || cacheName === ASSET_CACHE || cacheName === RSC_CACHE) return false;
                 return (
                     cacheName.startsWith('kvideo-') ||
                     LEGACY_CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix))
@@ -81,15 +99,18 @@ self.addEventListener('activate', (event) => {
 /**
  * 后台拉取最新 HTML 并写入外壳缓存。
  * 返回的 Promise 会同时用于 waitUntil（保证写入不被页面生命周期打断）和首访兜底。
+ *
+ * cacheKey 默认用请求本身；带查询参数的外壳页会传入「去掉查询串」的地址，
+ * 让同一页面的不同参数共用一份外壳缓存。
  */
-function refreshShellCache(request) {
+function refreshShellCache(request, cacheKey = request) {
     return fetch(request)
         .then(async (response) => {
             if (response.ok) {
                 const copy = response.clone();
                 try {
                     const cache = await caches.open(SHELL_CACHE);
-                    await cache.put(request, copy);
+                    await cache.put(cacheKey, copy);
                 } catch {
                     // 写入失败不影响本次响应
                 }
@@ -103,9 +124,9 @@ function refreshShellCache(request) {
  * 导航请求：缓存优先 + 后台更新。
  * 命中缓存时立即返回，页面外壳可在几毫秒内渲染，后台拿到的新 HTML 覆盖缓存供下次启动使用。
  */
-async function respondNavigation(request, networkUpdate) {
+async function respondNavigation(request, networkUpdate, cacheKey = request) {
     const cache = await caches.open(SHELL_CACHE);
-    const cached = await cache.match(request);
+    const cached = await cache.match(cacheKey);
 
     if (cached) {
         return cached;
@@ -118,6 +139,57 @@ async function respondNavigation(request, networkUpdate) {
 
     const fallback = await cache.match('/');
     return fallback || Response.error();
+}
+
+/**
+ * 是否为 App Router 的 RSC 数据请求。
+ * 这类请求决定点击导航后能否立刻渲染目标页，但它们既不是导航（document），
+ * 也不在 /api 下，原策略会完全放行给网络。
+ */
+function isRscRequest(request, url) {
+    if (request.headers.get('RSC') === '1') return true;
+    if (request.headers.get('Next-Router-Prefetch') === '1') return true;
+    return url.searchParams.has('_rsc');
+}
+
+/**
+ * RSC 请求：stale-while-revalidate。
+ * 缓存键使用完整 URL（含 Next 生成的 _rsc 标记），并刻意用字符串而不是 Request，
+ * 避免 Vary: Next-Router-State-Tree 导致同一页面的不同进入状态全部 miss。
+ */
+function handleRscRequest(event) {
+    const { request } = event;
+    const cacheKey = request.url;
+
+    const cachePromise = caches.open(RSC_CACHE);
+    const network = fetch(request)
+        .then(async (response) => {
+            const contentType = response.headers.get('content-type') || '';
+            if (response.ok && contentType.includes('text/x-component')) {
+                try {
+                    // 等待写入完成：让 waitUntil 覆盖整个缓存过程，避免被 SW 生命周期打断
+                    const cache = await cachePromise;
+                    await cache.put(cacheKey, response.clone());
+                } catch {
+                    // 缓存写入失败不影响本次响应
+                }
+            }
+            return response;
+        })
+        .catch(() => undefined);
+
+    event.waitUntil(network.then(() => undefined));
+
+    return (async () => {
+        const cache = await cachePromise;
+        const cached = await cache.match(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const fresh = await network;
+        return fresh || Response.error();
+    })();
 }
 
 /** 静态资源：缓存优先，未命中时请求并回填缓存 */
@@ -155,13 +227,28 @@ self.addEventListener('fetch', (event) => {
     if (url.origin !== self.location.origin) return;
 
     if (request.mode === 'navigate') {
-        // 搜索页、播放页等结果与查询参数强相关，缓存会展示上一次的内容，直接交给网络
-        if (url.search) return;
+        // 外壳与查询参数无关的页面（搜索/播放/高级版等）共用一份外壳缓存，
+        // 点击后可以直接渲染，不必每次等服务器返回。
+        if (url.search) {
+            if (!SHELL_QUERY_PATHNAMES.has(url.pathname)) return;
+
+            const cacheKey = `${url.origin}${url.pathname}`;
+            const networkUpdate = refreshShellCache(request, cacheKey);
+            event.waitUntil(networkUpdate.then(() => undefined));
+            event.respondWith(respondNavigation(request, networkUpdate, cacheKey));
+            return;
+        }
 
         // waitUntil 必须在监听器同步阶段调用，因此这里先创建更新任务再分发响应
         const networkUpdate = refreshShellCache(request);
         event.waitUntil(networkUpdate.then(() => undefined));
         event.respondWith(respondNavigation(request, networkUpdate));
+        return;
+    }
+
+    // App Router 的数据请求：命中缓存时立即返回目标页内容，后台静默更新
+    if (isRscRequest(request, url)) {
+        event.respondWith(handleRscRequest(event));
         return;
     }
 

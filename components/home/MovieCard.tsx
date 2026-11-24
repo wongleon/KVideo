@@ -20,15 +20,20 @@ interface DoubanMovie {
 interface MovieCardProps {
   movie: DoubanMovie;
   onMovieClick: (movie: DoubanMovie) => void;
+  /** 是否允许 Next.js 预取该链接；列表只对首屏前若干张开启 */
+  prefetch?: boolean;
 }
 
-export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieCardProps) {
+export const MovieCard = memo(function MovieCard({ movie, onMovieClick, prefetch = true }: MovieCardProps) {
   const [imageError, setImageError] = useState(false);
   const [fallbackError, setFallbackError] = useState(false);
+  // 点击后立即给出「正在打开」反馈：导航要等 RSC 请求返回，没有反馈会像点了没反应
+  const [isOpening, setIsOpening] = useState(false);
 
   return (
     <Link
       href={`/search?q=${encodeURIComponent(movie.title)}`}
+      prefetch={prefetch}
       onClick={(e) => {
         // Allow default behavior for modifier keys (new tab, etc.)
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -36,8 +41,11 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
         e.preventDefault();
         onMovieClick(movie);
       }}
+      onPointerDown={() => setIsOpening(true)}
+      onPointerCancel={() => setIsOpening(false)}
+      aria-busy={isOpening}
       data-focusable
-      className="group block cursor-pointer md:hover:translate-y-[-2px] transition-transform duration-200 ease-out"
+      className={`group block cursor-pointer md:hover:translate-y-[-2px] transition-[transform,opacity] duration-200 ease-out ${isOpening ? 'opacity-60' : 'opacity-100'}`}
       style={{
         position: 'relative',
         zIndex: 1
@@ -73,6 +81,14 @@ export const MovieCard = memo(function MovieCard({ movie, onMovieClick }: MovieC
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-[var(--glass-bg)]">
               <p className="text-sm text-[var(--text-muted)]">暂无图片</p>
+            </div>
+          )}
+          {isOpening && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/20">
+              <span
+                aria-hidden
+                className="h-8 w-8 animate-spin rounded-full border-2 border-white/80 border-t-transparent"
+              />
             </div>
           )}
           {movie.rate && parseFloat(movie.rate) > 0 && (

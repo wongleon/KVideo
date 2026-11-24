@@ -3,6 +3,7 @@
  * Matches HistoryItem layout for consistency
  */
 
+import { memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Icons } from '@/components/ui/Icon';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
@@ -15,75 +16,105 @@ interface FavoritesItemProps {
     item: FavoriteItem;
     /** 同一部剧的观看历史，存在时共享其线路、集数与播放进度 */
     historyItem?: VideoHistoryItem;
-    onRemove: () => void;
+    /** 取消收藏回调：由列表层保证引用稳定 */
+    onRemove: (videoId: string | number, source: string) => void;
     isPremium?: boolean;
+    /** 是否允许 Next.js 预取；列表只对前几条开启 */
+    prefetch?: boolean;
 }
 
-export function FavoritesItem({ item, historyItem, onRemove, isPremium = false }: FavoritesItemProps) {
-    // 有观看历史时沿用历史记录的线路
+interface FavoritePlayContext {
+    playSource: string;
+    playVideoId: string | number;
+    videoUrl: string;
+}
+
+function buildGroupedSources(item: FavoriteItem, historyItem: VideoHistoryItem | undefined) {
     const playSource = historyItem?.source || item.source;
     const playVideoId = historyItem
         ? (historyItem.sourceMap?.[historyItem.source] ?? historyItem.videoId)
         : item.videoId;
 
-    const getGroupedSources = () => {
-        // 优先使用播放页回写到历史记录的完整线路列表
-        if (historyItem?.sources && historyItem.sources.length > 0) {
-            const list = historyItem.sources.map((entry) => ({
-                id: entry.id,
-                source: entry.source,
-                sourceName: entry.sourceName || getSourceName(entry.source),
-                pic: item.poster,
-            }));
-            // 确保当前播放线路在列表中，避免播放页再追加一条同源线路
-            if (!list.some((entry) => entry.source === playSource && String(entry.id) === String(playVideoId))) {
-                list.unshift({
-                    id: playVideoId,
-                    source: playSource,
-                    sourceName: getSourceName(playSource),
-                    pic: item.poster,
-                });
-            }
-            return list;
-        }
-
-        // 否则合并收藏与历史记录里已知的线路，历史记录的 id 优先
-        const sourceMap = { ...(item.sourceMap || {}), ...(historyItem?.sourceMap || {}) };
-        return Object.entries(sourceMap).map(([sourceName, videoId]) => ({
-            id: videoId,
-            source: sourceName,
-            sourceName: getSourceName(sourceName),
+    // 优先使用播放页回写到历史记录的完整线路列表
+    if (historyItem?.sources && historyItem.sources.length > 0) {
+        const list = historyItem.sources.map((entry) => ({
+            id: entry.id,
+            source: entry.source,
+            sourceName: entry.sourceName || getSourceName(entry.source),
             pic: item.poster,
         }));
-    };
-
-    const getVideoUrl = (): string => {
-        const params = new URLSearchParams({
-            id: playVideoId.toString(),
-            source: playSource,
-            title: item.title,
-        });
-
-        // 有历史记录时带上集数与播放进度，进入播放页后直接续播
-        if (historyItem) {
-            params.set('episode', String(historyItem.episodeIndex));
-            if (historyItem.playbackPosition > 1) {
-                params.set('t', String(Math.floor(historyItem.playbackPosition)));
-            }
+        // 确保当前播放线路在列表中，避免播放页再追加一条同源线路
+        if (!list.some((entry) => entry.source === playSource && String(entry.id) === String(playVideoId))) {
+            list.unshift({
+                id: playVideoId,
+                source: playSource,
+                sourceName: getSourceName(playSource),
+                pic: item.poster,
+            });
         }
+        return { playSource, playVideoId, list };
+    }
 
-        const groupData = getGroupedSources();
-        if (groupData.length > 1) {
-            const cacheKey = storeGroupedSources(groupData);
-            if (cacheKey) {
-                params.set('gs', cacheKey);
-            }
+    // 否则合并收藏与历史记录里已知的线路，历史记录的 id 优先
+    const sourceMap = { ...(item.sourceMap || {}), ...(historyItem?.sourceMap || {}) };
+    const list = Object.entries(sourceMap).map(([sourceName, videoId]) => ({
+        id: videoId,
+        source: sourceName,
+        sourceName: getSourceName(sourceName),
+        pic: item.poster,
+    }));
+    return { playSource, playVideoId, list };
+}
+
+function buildFavoriteUrl(item: FavoriteItem, historyItem: VideoHistoryItem | undefined, isPremium: boolean): FavoritePlayContext {
+    const { playSource, playVideoId, list } = buildGroupedSources(item, historyItem);
+
+    const params = new URLSearchParams({
+        id: playVideoId.toString(),
+        source: playSource,
+        title: item.title,
+    });
+
+    // 有历史记录时带上集数与播放进度，进入播放页后直接续播
+    if (historyItem) {
+        params.set('episode', String(historyItem.episodeIndex));
+        if (historyItem.playbackPosition > 1) {
+            params.set('t', String(Math.floor(historyItem.playbackPosition)));
         }
-        if (isPremium) {
-            params.set('premium', '1');
+    }
+
+    // 已知海报带到播放页，详情返回前可以先渲染出来
+    const poster = buildPosterUrl(item.poster);
+    if (poster) {
+        params.set('pic', poster);
+    }
+
+    if (list.length > 1) {
+        const cacheKey = storeGroupedSources(list);
+        if (cacheKey) {
+            params.set('gs', cacheKey);
         }
-        return `/player?${params.toString()}`;
-    };
+    }
+    if (isPremium) {
+        params.set('premium', '1');
+    }
+
+    return { playSource, playVideoId, videoUrl: `/player?${params.toString()}` };
+}
+
+export const FavoritesItem = memo(function FavoritesItem({
+    item,
+    historyItem,
+    onRemove,
+    isPremium = false,
+    prefetch = true,
+}: FavoritesItemProps) {
+    // 生成 URL 会写 sessionStorage（同步 API），只在数据变化时计算一次
+    const playContext = useMemo(
+        () => buildFavoriteUrl(item, historyItem, isPremium),
+        [item, historyItem, isPremium],
+    );
+    const [isOpening, setIsOpening] = useState(false);
 
     // 集数：有历史记录时显示历史记录的观看集数，否则沿用收藏时记录的信息
     const historyEpisodeText = historyItem
@@ -95,9 +126,12 @@ export function FavoritesItem({ item, historyItem, onRemove, isPremium = false }
         <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-lg overflow-hidden hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
             {/* 使用客户端导航：避免整页跳转丢失用户手势，进入播放页后可自动播放 */}
             <Link
-                href={getVideoUrl()}
-                prefetch={false}
-                className="block"
+                href={playContext.videoUrl}
+                prefetch={prefetch}
+                onPointerDown={() => setIsOpening(true)}
+                onPointerCancel={() => setIsOpening(false)}
+                aria-busy={isOpening}
+                className={`block transition-opacity duration-150 ${isOpening ? 'opacity-60' : 'opacity-100'}`}
             >
                 <div className="flex items-stretch gap-3">
                     {/* Poster：竖版，上下贴边、与左侧边框无间距 */}
@@ -122,8 +156,14 @@ export function FavoritesItem({ item, historyItem, onRemove, isPremium = false }
 
                     {/* Info */}
                     <div className="flex-1 min-w-0 flex flex-col justify-start gap-1.5 pt-2 pb-3">
-                        <h3 className="text-base font-medium text-[var(--text-color)] truncate group-hover:text-[var(--accent-color)] transition-colors">
-                            {item.title}
+                        <h3 className="flex items-center gap-2 text-base font-medium text-[var(--text-color)] group-hover:text-[var(--accent-color)] transition-colors">
+                            <span className="truncate">{item.title}</span>
+                            {isOpening && (
+                                <span
+                                    aria-hidden
+                                    className="h-3.5 w-3.5 flex-shrink-0 animate-spin rounded-full border-2 border-[var(--accent-color)] border-t-transparent"
+                                />
+                            )}
                         </h3>
                         {item.year && (
                             <p className="text-xs text-[var(--text-color-secondary)]">
@@ -161,7 +201,7 @@ export function FavoritesItem({ item, historyItem, onRemove, isPremium = false }
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                onRemove();
+                                onRemove(item.videoId, item.source);
                             }}
                             className="p-2.5 hover:bg-[var(--glass-bg)] rounded-full cursor-pointer"
                             aria-label="取消收藏"
@@ -173,4 +213,4 @@ export function FavoritesItem({ item, historyItem, onRemove, isPremium = false }
             </Link>
         </div>
     );
-}
+});

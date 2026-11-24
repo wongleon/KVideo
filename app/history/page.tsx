@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHistory, useHistoryStore } from '@/lib/store/history-store';
 import { useFavorites, useFavoritesStore } from '@/lib/store/favorites-store';
 import { useCloudSync } from '@/lib/hooks/useCloudSync';
@@ -16,6 +16,19 @@ const LIST_OPTIONS: { value: ListMode; label: string }[] = [
   { value: 'favorites', label: '我的收藏' },
 ];
 
+/** 空闲时执行回调，浏览器不支持时退化为延时执行 */
+function runWhenIdle(callback: () => void) {
+  const requestIdle = (window as Window & {
+    requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+  }).requestIdleCallback;
+
+  if (requestIdle) {
+    requestIdle(callback, { timeout: 1500 });
+    return;
+  }
+  window.setTimeout(callback, 300);
+}
+
 /**
  * 追剧页面 - 左上角按钮通过选择器在「观看历史」与「我的收藏」之间切换
  */
@@ -23,13 +36,24 @@ export default function HistoryPage() {
   const { viewingHistory, removeFromHistory, clearHistory } = useHistory();
   const { favorites, removeFavorite, clearFavorites } = useFavorites();
   const { pullFromCloud } = useCloudSync();
+  const syncPendingRef = useRef(false);
 
   // 重新读取最新数据：先重新水合本地存储，再合并拉取云端记录。
   // 合并而不是覆盖，避免云端还没收到最新推送时把刚看完的记录冲掉。
+  //
+  // 注意：rehydrate 会同步解析 localStorage 并触发整列表重渲染，pullFromCloud 还会发起网络请求。
+  // 如果直接在 pageshow / visibilitychange 时同步执行，会和用户「点击下一条记录」争抢主线程，
+  // 表现就是点击不灵敏，因此统一推迟到浏览器空闲时执行。
   const syncLatest = useCallback(() => {
-    void useHistoryStore.persist.rehydrate();
-    void useFavoritesStore.persist.rehydrate();
-    pullFromCloud({ merge: true });
+    if (syncPendingRef.current) return;
+    syncPendingRef.current = true;
+
+    runWhenIdle(() => {
+      syncPendingRef.current = false;
+      void useHistoryStore.persist.rehydrate();
+      void useFavoritesStore.persist.rehydrate();
+      pullFromCloud({ merge: true });
+    });
   }, [pullFromCloud]);
 
   useEffect(() => {
@@ -66,6 +90,15 @@ export default function HistoryPage() {
   const isHistory = mode === 'history';
   const activeLabel = LIST_OPTIONS.find((option) => option.value === mode)?.label ?? '';
   const currentCount = isHistory ? viewingHistory.length : favorites.length;
+
+  // 引用稳定的删除回调：列表项已 memo，内联箭头会导致每次页面渲染都重渲染整个列表
+  const handleRemoveHistory = useCallback((showIdentifier: string) => {
+    setDeleteConfirm({ isOpen: true, showIdentifier });
+  }, []);
+
+  const handleRemoveFavorite = useCallback((videoId: string | number, source: string) => {
+    setDeleteConfirm({ isOpen: true, videoId, source });
+  }, []);
 
   const confirmDelete = () => {
     if (deleteConfirm.isClearAll) {
@@ -176,12 +209,12 @@ export default function HistoryPage() {
           {isHistory ? (
             <HistoryList
               history={viewingHistory}
-              onRemove={(showIdentifier) => setDeleteConfirm({ isOpen: true, showIdentifier })}
+              onRemove={handleRemoveHistory}
             />
           ) : (
             <FavoritesList
               favorites={favorites}
-              onRemove={(videoId, source) => setDeleteConfirm({ isOpen: true, videoId, source })}
+              onRemove={handleRemoveFavorite}
             />
           )}
         </div>

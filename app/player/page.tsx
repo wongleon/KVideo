@@ -6,6 +6,7 @@ import { VideoPlayer } from '@/components/player/VideoPlayer';
 import { VideoMetadata } from '@/components/player/VideoMetadata';
 import { EpisodeList } from '@/components/player/EpisodeList';
 import { PlayerError } from '@/components/player/PlayerError';
+import { PlayerPageSkeleton } from '@/components/player/PlayerPageSkeleton';
 import { SourceInfo } from '@/components/player/EpisodeList';
 import type { VideoSource } from '@/lib/types';
 import type { VideoResolutionInfo } from '@/components/player/hooks/useVideoResolution';
@@ -38,6 +39,8 @@ function PlayerContent() {
   const source = searchParams.get('source');
   const title = searchParams.get('title');
   const episodeParam = searchParams.get('episode');
+  // 历史/收藏带过来的已知海报：详情返回前先渲染骨架，避免整页只有 spinner
+  const posterParam = searchParams.get('pic') || undefined;
   // Support both legacy 'groupedSources' (full JSON) and new 'gs' (sessionStorage key)
   const groupedSourcesParam = searchParams.get('groupedSources');
   const gsKey = searchParams.get('gs');
@@ -446,10 +449,7 @@ function PlayerContent() {
     <div className="min-h-screen bg-[var(--bg-color)]">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-3">
         {loading && !videoData ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-[var(--accent-color)] border-t-transparent mb-4"></div>
-            <p className="text-[var(--text-color-secondary)]">正在加载视频详情...</p>
-          </div>
+          <PlayerPageSkeleton poster={posterParam} title={title || undefined} />
         ) : videoError && !videoData ? (
           <PlayerError
             error={videoError}
@@ -590,8 +590,10 @@ function PlayerContent() {
 export default function PlayerPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-color)]">
-        <div className="animate-spin rounded-full h-16 w-16 border-4 border-[var(--accent-color)] border-t-transparent"></div>
+      <div className="min-h-screen bg-[var(--bg-color)]">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-3">
+          <PlayerPageSkeleton />
+        </main>
       </div>
     }>
       <PlayerContent />

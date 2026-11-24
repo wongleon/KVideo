@@ -23,14 +23,19 @@ interface FeaturedMovieCardProps {
 
 export function FeaturedMovieCard({ movie, onMovieClick }: FeaturedMovieCardProps) {
   const [imageError, setImageError] = useState(false);
+  // 点击后立即给出「正在打开」反馈，避免导航等待 RSC 时看起来没反应
+  const [isOpening, setIsOpening] = useState(false);
 
   return (
     <button
       type="button"
       onClick={() => onMovieClick(movie)}
+      onPointerDown={() => setIsOpening(true)}
+      onPointerCancel={() => setIsOpening(false)}
+      aria-busy={isOpening}
       aria-label={movie.title}
       data-focusable
-      className="relative block w-full aspect-[16/9] overflow-hidden rounded-xl bg-[var(--glass-bg)] mb-3 text-left cursor-pointer md:hidden"
+      className={`relative block w-full aspect-[16/9] overflow-hidden rounded-xl bg-[var(--glass-bg)] mb-3 text-left cursor-pointer md:hidden transition-opacity duration-150 ${isOpening ? 'opacity-60' : 'opacity-100'}`}
     >
       <Image
         // 封面加载失败时回落到占位图，避免大卡片整块空白
@@ -46,6 +51,14 @@ export function FeaturedMovieCard({ movie, onMovieClick }: FeaturedMovieCardProp
         onError={() => setImageError(true)}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+      {isOpening && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/20">
+          <span
+            aria-hidden
+            className="h-8 w-8 animate-spin rounded-full border-2 border-white/80 border-t-transparent"
+          />
+        </div>
+      )}
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4">
         <h2 className="text-white text-base sm:text-xl font-bold truncate">{movie.title}</h2>
         {movie.rate && parseFloat(movie.rate) > 0 && (

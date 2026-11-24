@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { HistoryItem } from './HistoryItem';
 import { HistoryEmptyState } from './HistoryEmptyState';
 import type { VideoHistoryItem } from '@/lib/types';
@@ -5,11 +6,19 @@ import { keepRenderableHistory } from '@/lib/utils/sync-records';
 
 interface HistoryListProps {
     history: VideoHistoryItem[];
+    /** 删除回调：需要由调用方用 useCallback 保证引用稳定 */
     onRemove: (showIdentifier: string) => void;
     isPremium?: boolean;
 }
 
-export function HistoryList({ history, onRemove, isPremium = false }: HistoryListProps) {
+/** 只对视口内前几条开启预取，避免几十条历史同时发起 RSC 请求 */
+const PREFETCH_LIMIT = 8;
+
+export const HistoryList = memo(function HistoryList({
+    history,
+    onRemove,
+    isPremium = false,
+}: HistoryListProps) {
     const renderableHistory = keepRenderableHistory(history);
 
     return (
@@ -21,16 +30,17 @@ export function HistoryList({ history, onRemove, isPremium = false }: HistoryLis
                 <HistoryEmptyState />
             ) : (
                 <div className="space-y-3">
-                    {renderableHistory.map((item) => (
+                    {renderableHistory.map((item, index) => (
                         <HistoryItem
                             key={item.showIdentifier}
                             item={item}
-                            onRemove={() => onRemove(item.showIdentifier)}
+                            onRemove={onRemove}
                             isPremium={isPremium}
+                            prefetch={index < PREFETCH_LIMIT}
                         />
                     ))}
                 </div>
             )}
         </div>
     );
-}
+});
